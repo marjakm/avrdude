@@ -1,6 +1,6 @@
 /*
  * avrdude - A Downloader/Uploader for AVR device programmers
- * Copyright (C) 2003-2004  Theodore A. Roth  <troth@openavr.org>
+ * Copyright (C) 2003  Theodore A. Roth  <troth@openavr.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -13,25 +13,17 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /* $Id$ */
 
-#ifndef butterfly_h
-#define butterfly_h
+#ifndef __butterfly_h__
+#define __butterfly_h__
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "config.h"
 
-extern const char butterfly_desc[];
-extern const char butterfly_mk_desc[];
 void butterfly_initpgm (PROGRAMMER * pgm);
-void butterfly_mk_initpgm (PROGRAMMER * pgm);
 
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* butterfly_h */
+#endif /* __butterfly_h__ */
