@@ -13,7 +13,8 @@
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with this program. If not, see <http://www.gnu.org/licenses/>.
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
 #
@@ -36,6 +37,8 @@ EXTRA_DIST   = \
 
 bin_PROGRAMS = loaddrv
 
+loaddrv_CFLAGS = -mno-cygwin
+
 loaddrv_SOURCES = \
 	loaddrv.c \
 	loaddrv.h
@@ -51,7 +54,7 @@ install-exec-local:
 
 uninstall-local:
 	@for file in $(local_install_list); do \
-		echo " rm -f $(DESTDIR)$(bindir)/$$file"; \
-		rm -f $(DESTDIR)$(bindir)/$$file; \
+		echo " rm -f $(DESTDIR)$(bindir)"; \
+		rm -f $(DESTDIR)$(bindir); \
 	done
 
