@@ -1,23 +1,4 @@
-/*
- * avrdude - A Downloader/Uploader for AVR device programmers
- * Copyright (C) 1990-2004  Brian S. Dean <bsd@bsdhome.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
-
  /* $Id$ */
-
 
 
 /*----------------------------------------------------------------------
@@ -34,13 +15,12 @@
   Author : Brian Dean
   Date   : 10 January, 1990
   ------------------------------------------------------------------------*/
-
-#include "ac_cfg.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "libavrdude.h"
+#include "lists.h"
+
+char * lists_version = "$Id$";
 
 #define MAGIC 0xb05b05b0
 
@@ -411,6 +391,11 @@ lcreat ( void * liststruct, int elements )
 {
   LIST * l;
 
+  if (LISTSZ != sizeof(LIST)) {
+    printf ( "lcreat(): warning, LISTSZ[%d] != sizeof(LIST)[%d]\n",
+             LISTSZ, sizeof(LIST) );
+  }
+
   if (liststruct == NULL) {
     /*--------------------------------------------------
       allocate memory for the list itself
@@ -477,7 +462,7 @@ lcreat ( void * liststruct, int elements )
 |  at the same time.
  --------------------------------------------------*/
 void 
-ldestroy_cb ( LISTID lid, void (*ucleanup)(void * data_ptr) )
+ldestroy_cb ( LISTID lid, void (*ucleanup)() )
 {
   LIST * l;
   LISTNODE * ln;
@@ -1279,43 +1264,6 @@ lsrch ( LISTID lid, void * p, int (* compare)(void * p1, void * p2) )
   return NULL;
 }
 
-/*----------------------------------------------------------------------
-|  lsort
-|
-|  sort list - sorts list inplace (using bubble sort)
-|
- ----------------------------------------------------------------------*/
-void
-lsort ( LISTID lid, int (* compare)(void * p1, void * p2) )
-{
-  LIST * l;
-  LISTNODE * lt; /* this */
-  LISTNODE * ln; /* next */
-  int unsorted = 1;
-
-  l = (LIST *)lid;
-
-  CKLMAGIC(l);
-
-  while(unsorted){
-    lt = l->top;
-    unsorted = 0;
-    while (lt!=NULL) {
-      CKMAGIC(lt);
-      ln = lt->next;
-      if (ln!= NULL && compare(lt->data,ln->data) > 0) {
-        void * p = ln->data;
-        ln->data = lt->data;
-        lt->data = p;
-        unsorted = 1;
-      }
-      lt = ln;
-    }
-  }
-
-  CKLMAGIC(l);
-}
-
 
 int lprint ( FILE * f, LISTID lid )
 {
@@ -1326,8 +1274,8 @@ int lprint ( FILE * f, LISTID lid )
 
   l = (LIST *)lid;
 
-  fprintf ( f, "list id %p internal data structures:\n", 
-            lid );
+  fprintf ( f, "list id 0x%08x internal data structures:\n", 
+            (unsigned int)lid );
 #if CHECK_MAGIC
   if ((l->magic1 != MAGIC) || (l->magic2 != MAGIC)) {
     fprintf ( f, "  *** WARNING: LIST MAGIC IS CORRUPT ***\n" );
