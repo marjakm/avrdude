@@ -35,81 +35,9 @@
 #include "config.h"
 
 
-/*
- * PPI registers
- */
-enum {
-  PPIDATA,
-  PPICTRL,
-  PPISTATUS
-};
-
-int ppi_getops    (int reg, unsigned long * get, unsigned long * set);
-
-int ppi_set       (int fd, int reg, int bit);
-
-int ppi_clr       (int fd, int reg, int bit);
-
-int ppi_get       (int fd, int reg, int bit);
-
-int ppi_toggle    (int fd, int reg, int bit);
-
-int ppi_getall    (int fd, int reg);
-
-int ppi_setall    (int fd, int reg, int val);
-
-int ppi_pulse     (int fd, int reg, int bit);
-
-int ppi_setpin    (int fd, int pin, int value);
-
-int ppi_getpin    (int fd, int pin);
-
-int ppi_pulsepin  (int fd, int pin);
+void ppi_initpgm        (PROGRAMMER * pgm);
 
 int ppi_getpinmask(int pin);
-
-int ppi_getpinreg (int pin);
-
-int ppi_sense     (int fd);
-
-
-void ppi_initpgm        (PROGRAMMER * pgm);
-
-
-int  ppi_rdy_led        (PROGRAMMER * pgm, int value);
-
-int  ppi_err_led        (PROGRAMMER * pgm, int value);
-
-int  ppi_pgm_led        (PROGRAMMER * pgm, int value);
-
-int  ppi_vfy_led        (PROGRAMMER * pgm, int value);
-
-int  ppi_cmd            (PROGRAMMER * pgm, unsigned char cmd[4], 
-                         unsigned char res[4]);
-
-int  ppi_chip_erase     (PROGRAMMER * pgm, AVRPART * p);
-
-int  ppi_program_enable (PROGRAMMER * pgm, AVRPART * p);
-
-void ppi_powerup        (PROGRAMMER * pgm);
-
-void ppi_powerdown      (PROGRAMMER * pgm);
-
-int  ppi_initialize     (PROGRAMMER * pgm, AVRPART * p);
-
-int  ppi_save           (PROGRAMMER * pgm);
-
-void ppi_restore        (PROGRAMMER * pgm);
-
-void ppi_disable        (PROGRAMMER * pgm);
-
-void ppi_enable         (PROGRAMMER * pgm);
-
-void ppi_open           (PROGRAMMER * pgm, char * port);
-
-void ppi_close          (PROGRAMMER * pgm);
-
-void ppi_initpgm        (PROGRAMMER * pgm);
 
 
 
