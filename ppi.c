@@ -1,109 +1,88 @@
 /*
- * avrdude - A Downloader/Uploader for AVR device programmers
- * Copyright (C) 2000-2004  Brian S. Dean <bsd@bsdhome.com>
+ * Copyright 2000  Brian S. Dean <bsd@bsdhome.com>
+ * All Rights Reserved.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * THIS SOFTWARE IS PROVIDED BY BRIAN S. DEAN ``AS IS'' AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL BRIAN S. DEAN BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
+ * OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+ * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+ * DAMAGE.
+ * 
  */
 
 /* $Id$ */
 
-
-#if !defined(WIN32NATIVE)
-
-#include "ac_cfg.h"
-
-#if HAVE_PARPORT
-
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <fcntl.h>
 #include <unistd.h>
-#include <errno.h>
-
-#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
-# include "freebsd_ppi.h"
-#elif defined(__linux__)
-# include "linux_ppdev.h"
-#elif defined(__sun__) || defined(__sun) /* Solaris */
-# include "solaris_ecpp.h"
-#endif
-
-#include "avrdude.h"
-#include "libavrdude.h"
+#include </sys/dev/ppbus/ppi.h>
 
 #include "ppi.h"
 
-enum {
-  PPI_READ,
-  PPI_WRITE,
-  PPI_SHADOWREAD
-};
+extern char * progname;
 
-static int ppi_shadow_access(union filedescriptor *fdp, int reg,
-			     unsigned char *v, unsigned char action)
+/*
+ * set 'get' and 'set' appropriately for subsequent passage to ioctl()
+ * to get/set the specified PPI registers.  
+ */
+int ppi_getops ( int reg, unsigned long * get, unsigned long * set )
 {
-  static unsigned char shadow[3];
-  int shadow_num;
-
   switch (reg) {
     case PPIDATA:
-      shadow_num = 0;
+      *set = PPISDATA;
+      *get = PPIGDATA;
       break;
     case PPICTRL:
-      shadow_num = 1;
+      *set = PPISCTRL;
+      *get = PPIGCTRL;
       break;
     case PPISTATUS:
-      shadow_num = 2;
+      *set = PPISSTATUS;
+      *get = PPIGSTATUS;
       break;
     default:
-      avrdude_message(MSG_INFO, "%s: avr_set(): invalid register=%d\n",
-              progname, reg);
+      fprintf(stderr, "%s: avr_set(): invalid register=%d\n",
+              progname, reg );
       return -1;
       break;
   }
 
-  switch (action) {
-    case PPI_SHADOWREAD:
-      *v = shadow[shadow_num];
-      break;
-    case PPI_READ:
-      DO_PPI_READ(fdp->ifd, reg, v);
-      shadow[shadow_num]=*v;
-      break;
-    case PPI_WRITE:
-      shadow[shadow_num]=*v;
-      DO_PPI_WRITE(fdp->ifd, reg, v);
-      break;
-  }
   return 0;
 }
+
 
 /*
  * set the indicated bit of the specified register.
  */
-int ppi_set(union filedescriptor *fdp, int reg, int bit)
+int ppi_set ( int fd, int reg, int bit )
 {
   unsigned char v;
+  unsigned long get, set;
   int rc;
 
-  rc = ppi_shadow_access(fdp, reg, &v, PPI_SHADOWREAD);
-  v |= bit;
-  rc |= ppi_shadow_access(fdp, reg, &v, PPI_WRITE);
-
+  rc = ppi_getops ( reg, &get, &set );
   if (rc)
     return -1;
+
+  ioctl(fd, get, &v);
+  v |= bit;
+  ioctl(fd, set, &v);
 
   return 0;
 }
@@ -112,17 +91,19 @@ int ppi_set(union filedescriptor *fdp, int reg, int bit)
 /*
  * clear the indicated bit of the specified register.
  */
-int ppi_clr(union filedescriptor *fdp, int reg, int bit)
+int ppi_clr ( int fd, int reg, int bit )
 {
   unsigned char v;
+  unsigned long get, set;
   int rc;
 
-  rc = ppi_shadow_access(fdp, reg, &v, PPI_SHADOWREAD);
-  v &= ~bit;
-  rc |= ppi_shadow_access(fdp, reg, &v, PPI_WRITE);
-
+  rc = ppi_getops ( reg, &get, &set );
   if (rc)
     return -1;
+
+  ioctl(fd, get, &v);
+  v &= ~bit;
+  ioctl(fd, set, &v);
 
   return 0;
 }
@@ -131,34 +112,38 @@ int ppi_clr(union filedescriptor *fdp, int reg, int bit)
 /*
  * get the indicated bit of the specified register.
  */
-int ppi_get(union filedescriptor *fdp, int reg, int bit)
+int ppi_get ( int fd, int reg, int bit )
 {
   unsigned char v;
+  unsigned long get, set;
   int rc;
 
-  rc = ppi_shadow_access(fdp, reg, &v, PPI_READ);
-  v &= bit;
-
+  rc = ppi_getops ( reg, &get, &set );
   if (rc)
     return -1;
 
-  return v; /* v == bit */
+  ioctl(fd, get, &v);
+  v &= bit;
+
+  return (v == bit);
 }
 
 /*
  * toggle the indicated bit of the specified register.
  */
-int ppi_toggle(union filedescriptor *fdp, int reg, int bit)
+int ppi_toggle ( int fd, int reg, int bit )
 {
   unsigned char v;
+  unsigned long get, set;
   int rc;
 
-  rc = ppi_shadow_access(fdp, reg, &v, PPI_SHADOWREAD);
-  v ^= bit;
-  rc |= ppi_shadow_access(fdp, reg, &v, PPI_WRITE);
-
+  rc = ppi_getops ( reg, &get, &set );
   if (rc)
     return -1;
+
+  ioctl(fd, get, &v);
+  v ^= bit;
+  ioctl(fd, set, &v);
 
   return 0;
 }
@@ -167,70 +152,73 @@ int ppi_toggle(union filedescriptor *fdp, int reg, int bit)
 /*
  * get all bits of the specified register.
  */
-int ppi_getall(union filedescriptor *fdp, int reg)
+int ppi_getall ( int fd, int reg )
 {
   unsigned char v;
+  unsigned long get, set;
   int rc;
 
-  rc = ppi_shadow_access(fdp, reg, &v, PPI_READ);
-
+  rc = ppi_getops ( reg, &get, &set );
   if (rc)
     return -1;
 
-  return v; /* v == bit */
+  ioctl(fd, get, &v);
+
+  return (int)v;
 }
 
 /*
  * set all bits of the specified register to val.
  */
-int ppi_setall(union filedescriptor *fdp, int reg, int val)
+int ppi_setall ( int fd, int reg, int val )
 {
   unsigned char v;
+  unsigned long get, set;
   int rc;
 
-  v = val;
-  rc = ppi_shadow_access(fdp, reg, &v, PPI_WRITE);
-
+  rc = ppi_getops ( reg, &get, &set );
   if (rc)
     return -1;
+
+  v = val;
+  ioctl(fd, set, &v);
+
+  return 0;
+}
+
+/*
+ * pulse the indicated bit of the specified register.
+ */
+int ppi_pulse ( int fd, int reg, int bit )
+{
+  ppi_toggle(fd, reg, bit);
+  ppi_toggle(fd, reg, bit);
 
   return 0;
 }
 
 
-void ppi_open(char * port, union filedescriptor *fdp)
+/*
+ * infinite loop, sensing on the pin that we use to read data out of
+ * the device; this is a debugging aid, you can insert a call to this
+ * function in 'main()' and can use it to determine whether your sense
+ * pin is actually sensing.  
+ */
+int ppi_sense_test ( int fd, int reg, int bit )
 {
-  int fd;
-  unsigned char v;
+  unsigned char v, pv;
 
-  fd = open(port, O_RDWR);
-  if (fd < 0) {
-    avrdude_message(MSG_INFO, "%s: can't open device \"%s\": %s\n",
-              progname, port, strerror(errno));
-    fdp->ifd = -1;
-    return;
-  }
+  pv = 1;
+  do {
+    usleep(100000); /* check every 100 ms */
+    v = ppi_get(fd, reg, bit);
+    if (v != pv) {
+      fprintf ( stderr, "sense bit = %d\n", v );
+    }
+    pv = v;
+  } while(1);
 
-  ppi_claim (fd);
-
-  /*
-   * Initialize shadow registers
-   */
-
-  ppi_shadow_access (fdp, PPIDATA, &v, PPI_READ);
-  ppi_shadow_access (fdp, PPICTRL, &v, PPI_READ);
-  ppi_shadow_access (fdp, PPISTATUS, &v, PPI_READ);
-
-  fdp->ifd = fd;
+  return 0;
 }
 
 
-void ppi_close(union filedescriptor *fdp)
-{
-  ppi_release (fdp->ifd);
-  close(fdp->ifd);
-}
-
-#endif /* HAVE_PARPORT */
-
-#endif /* !WIN32NATIVE */

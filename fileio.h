@@ -29,34 +29,36 @@
 
 /* $Id$ */
 
-#ifndef __ppi_h__
-#define __ppi_h__
+#ifndef __fileio_h__
+#define __fileio_h__
 
-/*
- * PPI registers
- */
-enum {
-  PPIDATA,
-  PPICTRL,
-  PPISTATUS
+typedef enum {
+  FMT_AUTO,
+  FMT_SREC,
+  FMT_IHEX,
+  FMT_RBIN
+} FILEFMT;
+
+struct fioparms {
+  int    op;
+  char * mode;
+  char * iodesc;
+  char * dir;
+  char * rw;
 };
 
-int ppi_getops ( int reg, unsigned long * get, unsigned long * set );
+enum {
+  FIO_READ,
+  FIO_WRITE
+};
 
-int ppi_set    ( int fd, int reg, int bit );
+#define MAX_LINE_LEN 256  /* max line length for ASCII format input files */
 
-int ppi_clr    ( int fd, int reg, int bit );
+char * fmtstr ( FILEFMT format );
 
-int ppi_get    ( int fd, int reg, int bit );
+int fileio_setparms ( int op, struct fioparms * fp );
 
-int ppi_toggle ( int fd, int reg, int bit );
-
-int ppi_getall ( int fd, int reg );
-
-int ppi_setall ( int fd, int reg, int val );
-
-int ppi_pulse  ( int fd, int reg, int bit );
+int fileio ( int op, char * filename, FILEFMT format, 
+             struct avrpart * p, AVRMEM memtype );
 
 #endif
-
-
