@@ -1,7 +1,6 @@
 /*
  * avrdude - A Downloader/Uploader for AVR device programmers
- * Copyright (C) 2003-2004  Theodore A. Roth  <troth@openavr.org>
- * Copyright (C) 2006 Joerg Wunsch <j@uriah.heep.sax.de>
+ * Copyright (C) 2003  Theodore A. Roth  <troth@openavr.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -14,7 +13,8 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /* $Id$ */
@@ -23,45 +23,23 @@
  * Posix serial interface for avrdude.
  */
 
-#if !defined(WIN32NATIVE)
-
-
-#include <ctype.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <sys/ioctl.h>
-#include <sys/types.h>
-#include <sys/time.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#ifdef __linux__
-#include <linux/serial.h>
-#endif
 
 #include <fcntl.h>
 #include <termios.h>
 #include <unistd.h>
 
-#include "avrdude.h"
-#include "libavrdude.h"
-
-long serial_recv_timeout = 5000; /* ms */
+extern char *progname;
 
 struct baud_mapping {
-  long baud;
+  int baud;
   speed_t speed;
 };
 
-static struct termios original_termios;
-static int saved_original_termios;
+/* There are a lot more baud rates we could handle, but what's the point? */
 
-#if !defined __linux__
-/* For linux this mapping is no longer needed.
- * (OSX and *BSD do not need this mapping either because for them,
- * Bxxx is the same as xxx.) */
 static struct baud_mapping baud_lookup_table [] = {
   { 1200,   B1200 },
   { 2400,   B2400 },
@@ -69,20 +47,13 @@ static struct baud_mapping baud_lookup_table [] = {
   { 9600,   B9600 },
   { 19200,  B19200 },
   { 38400,  B38400 },
-#ifdef B57600
   { 57600,  B57600 },
-#endif
-#ifdef B115200
   { 115200, B115200 },
-#endif
-#ifdef B230400
   { 230400, B230400 },
-#endif
   { 0,      0 }                 /* Terminator. */
 };
 
-
-static speed_t serial_baud_lookup(long baud)
+static speed_t serial_baud_lookup(int baud)
 {
   struct baud_mapping *map = baud_lookup_table;
 
@@ -92,418 +63,188 @@ static speed_t serial_baud_lookup(long baud)
     map++;
   }
 
-  /*
-   * If a non-standard BAUD rate is used, issue
-   * a warning (if we are verbose) and return the raw rate
-   */
-  avrdude_message(MSG_NOTICE, "%s: serial_baud_lookup(): Using non-standard baud rate: %ld",
-              progname, baud);
-
-  return baud;
+  fprintf(stderr, "%s: serial_baud_lookup(): unknown baud rate: %d", 
+          progname, baud);
+  exit(1);
 }
-#endif
 
-static int ser_setspeed(union filedescriptor *fd, long baud)
+static int serial_setattr(int fd, int baud)
 {
   int rc;
   struct termios termios;
-#if defined __linux__
-  /* for linux no conversion is needed*/
-  speed_t speed = baud;
-#else
-  /* converting the baud rate to the bit set needed by posix way*/
   speed_t speed = serial_baud_lookup (baud);
-#endif
   
-  if (!isatty(fd->ifd))
-    return -ENOTTY;
+  if (!isatty(fd))
+    return -1;
   
   /*
    * initialize terminal modes
    */
-  rc = tcgetattr(fd->ifd, &termios);
+  rc = tcgetattr(fd, &termios);
   if (rc < 0) {
-    avrdude_message(MSG_INFO, "%s: ser_setspeed(): tcgetattr() failed",
-            progname);
+    fprintf(stderr, "%s: serial_setattr(): tcgetattr() failed, %s", 
+            progname, strerror(errno));
     return -errno;
   }
 
-  /*
-   * copy termios for ser_close if we haven't already
-   */
-  if (! saved_original_termios++) {
-    original_termios = termios;
-  }
-
-  termios.c_iflag = IGNBRK;
+  termios.c_iflag = 0;
   termios.c_oflag = 0;
+  termios.c_cflag = 0;
+  termios.c_cflag |=   (CS8 | CREAD | CLOCAL);
   termios.c_lflag = 0;
-  termios.c_cflag = (CS8 | CREAD | CLOCAL);
   termios.c_cc[VMIN]  = 1;
   termios.c_cc[VTIME] = 0;
-#ifdef __linux__
-  /* Support for custom baud rate for linux is implemented by setting
-   * a dummy baud rate of 38400 and manupulating the custom divider of
-   * the serial interface*/
-  struct serial_struct  ss;
-  int ioret = ioctl(fd->ifd, TIOCGSERIAL, &ss);
-  if (ioret < 0){
-    avrdude_message(MSG_INFO,
-		    "%s: Cannot get serial port settings. ioctl returned %d\n",
-		    progname, ioret);
-    return -errno;
-  }
-  ss.flags = (ss.flags & ~ASYNC_SPD_MASK) | ASYNC_SPD_CUST;
-  ss.custom_divisor = (ss.baud_base + (speed / 2)) / speed;
-  unsigned int closestSpeed = ss.baud_base / ss.custom_divisor;
 
-  if (closestSpeed < speed * 98 / 100 || closestSpeed > speed * 102 / 100) {
-    avrdude_message(MSG_INFO,
-		    "%s: Cannot set serial port speed to %d. Closest possible is %d\n",
-		    progname, speed, closestSpeed);
-    return -errno;
-  }
-  ioret= ioctl(fd->ifd, TIOCSSERIAL, &ss);
-  if (ioret < 0){
-    avrdude_message(MSG_INFO,
-		    "%s: Cannot set serial port speed to %d. ioctl returned %d\n",
-		    progname, speed, ioret);
-    return -errno;
-  }
-  if (cfsetispeed(&termios, B38400) < 0){
-    avrdude_message(MSG_INFO,
-		    "%s: cfsetispeed: failed to set dummy baud\n",
-		    progname);
-    return -errno;
-  }
-  if (cfsetospeed(&termios, B38400) < 0){
-    avrdude_message(MSG_INFO,
-		    "%s: cfsetospeed: failed to set dummy baud\n",
-		    progname);
-    return -errno;
-  }
-#else  /* !linux */
-  if (cfsetospeed(&termios, speed) < 0){
-    avrdude_message(MSG_INFO,
-		    "%s: cfsetospeed: failed to set speed: %d\n",
-		    progname, speed);
-    return -errno;
-  }
-  if (cfsetispeed(&termios, speed) < 0){
-    avrdude_message(MSG_INFO,
-		    "%s: cfsetispeed: failed to set speed: %d\n",
-		    progname, speed);
-    return -errno;
-  }
-#endif	/* linux */
-  rc = tcsetattr(fd->ifd, TCSANOW, &termios);
+  cfsetospeed(&termios, speed);
+  cfsetispeed(&termios, speed);
+  
+  rc = tcsetattr(fd, TCSANOW, &termios);
   if (rc < 0) {
-    avrdude_message(MSG_INFO, "%s: ser_setspeed(): tcsetattr() failed\n",
-            progname);
+    fprintf(stderr, "%s: serial_setattr(): tcsetattr() failed, %s", 
+            progname, strerror(errno));
     return -errno;
-  }
-#ifdef __linux__
-  /* a bit more linux specific stuff to set custom baud rates*/
-  if (ioctl(fd->ifd, TIOCGSERIAL, &ss) < 0){
-    avrdude_message(MSG_INFO, "%s: ioctl: failed to get port settins\n", progname);
-    return -errno;
-  }
-  ss.flags &= ~ASYNC_SPD_MASK;
-  if (ioctl(fd->ifd, TIOCSSERIAL, &ss) < 0){
-    avrdude_message(MSG_INFO, "%s: ioctl: failed to set port settins\n", progname);
-    return -errno;
-  }
-#endif
-
-  /*
-   * Everything is now set up for a local line without modem control
-   * or flow control, so clear O_NONBLOCK again.
-   */
-  rc = fcntl(fd->ifd, F_GETFL, 0);
-  if (rc != -1)
-    fcntl(fd->ifd, F_SETFL, rc & ~O_NONBLOCK);
-
-  return 0;
-}
-
-/*
- * Given a port description of the form <host>:<port>, open a TCP
- * connection to the specified destination, which is assumed to be a
- * terminal/console server with serial parameters configured
- * appropriately (e. g. 115200-8-N-1 for a STK500.)
- */
-static int
-net_open(const char *port, union filedescriptor *fdp)
-{
-  char *hstr, *pstr, *end;
-  unsigned int pnum;
-  int fd;
-  struct sockaddr_in sockaddr;
-  struct hostent *hp;
-
-  if ((hstr = strdup(port)) == NULL) {
-    avrdude_message(MSG_INFO, "%s: net_open(): Out of memory!\n",
-	    progname);
-    return -1;
-  }
-
-  if (((pstr = strchr(hstr, ':')) == NULL) || (pstr == hstr)) {
-    avrdude_message(MSG_INFO, "%s: net_open(): Mangled host:port string \"%s\"\n",
-	    progname, hstr);
-    free(hstr);
-    return -1;
-  }
-
-  /*
-   * Terminate the host section of the description.
-   */
-  *pstr++ = '\0';
-
-  pnum = strtoul(pstr, &end, 10);
-
-  if ((*pstr == '\0') || (*end != '\0') || (pnum == 0) || (pnum > 65535)) {
-    avrdude_message(MSG_INFO, "%s: net_open(): Bad port number \"%s\"\n",
-	    progname, pstr);
-    free(hstr);
-    return -1;
-  }
-
-  if ((hp = gethostbyname(hstr)) == NULL) {
-    avrdude_message(MSG_INFO, "%s: net_open(): unknown host \"%s\"\n",
-	    progname, hstr);
-    free(hstr);
-    return -1;
-  }
-
-  free(hstr);
-
-  if ((fd = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
-    avrdude_message(MSG_INFO, "%s: net_open(): Cannot open socket: %s\n",
-	    progname, strerror(errno));
-    return -1;
-  }
-
-  memset(&sockaddr, 0, sizeof(struct sockaddr_in));
-  sockaddr.sin_family = AF_INET;
-  sockaddr.sin_port = htons(pnum);
-  memcpy(&(sockaddr.sin_addr.s_addr), hp->h_addr, sizeof(struct in_addr));
-
-  if (connect(fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr))) {
-    avrdude_message(MSG_INFO, "%s: net_open(): Connect failed: %s\n",
-	    progname, strerror(errno));
-    return -1;
-  }
-
-  fdp->ifd = fd;
-  return 0;
-}
-
-
-static int ser_set_dtr_rts(union filedescriptor *fdp, int is_on)
-{
-  unsigned int	ctl;
-  int           r;
-
-  r = ioctl(fdp->ifd, TIOCMGET, &ctl);
-  if (r < 0) {
-    perror("ioctl(\"TIOCMGET\")");
-    return -1;
-  }
-
-  if (is_on) {
-    /* Set DTR and RTS */
-    ctl |= (TIOCM_DTR | TIOCM_RTS);
-  }
-  else {
-    /* Clear DTR and RTS */
-    ctl &= ~(TIOCM_DTR | TIOCM_RTS);
-  }
-
-  r = ioctl(fdp->ifd, TIOCMSET, &ctl);
-  if (r < 0) {
-    perror("ioctl(\"TIOCMSET\")");
-    return -1;
   }
 
   return 0;
 }
 
-static int ser_open(char * port, union pinfo pinfo, union filedescriptor *fdp)
+
+int serial_open(char * port, int baud)
 {
   int rc;
   int fd;
-
-  /*
-   * If the port is of the form "net:<host>:<port>", then
-   * handle it as a TCP connection to a terminal server.
-   */
-  if (strncmp(port, "net:", strlen("net:")) == 0) {
-    return net_open(port + strlen("net:"), fdp);
-  }
 
   /*
    * open the serial port
    */
-  fd = open(port, O_RDWR | O_NOCTTY | O_NONBLOCK);
+  fd = open(port, O_RDWR | O_NOCTTY /*| O_NONBLOCK*/);
   if (fd < 0) {
-    avrdude_message(MSG_INFO, "%s: ser_open(): can't open device \"%s\": %s\n",
+    fprintf(stderr, "%s: serial_open(): can't open device \"%s\": %s\n",
             progname, port, strerror(errno));
-    return -1;
+    exit(1);
   }
-
-  fdp->ifd = fd;
 
   /*
    * set serial line attributes
    */
-  rc = ser_setspeed(fdp, pinfo.baud);
+  rc = serial_setattr(fd, baud);
   if (rc) {
-    avrdude_message(MSG_INFO, "%s: ser_open(): can't set attributes for device \"%s\": %s\n",
-                    progname, port, strerror(-rc));
-    close(fd);
-    return -1;
+    fprintf(stderr, 
+            "%s: serial_open(): can't set attributes for device \"%s\"\n",
+            progname, port);
+    exit(1);
   }
-  return 0;
+
+  return fd;
 }
 
 
-static void ser_close(union filedescriptor *fd)
+void serial_close(int fd)
 {
-  /*
-   * restore original termios settings from ser_open
-   */
-  if (saved_original_termios) {
-    int rc = tcsetattr(fd->ifd, TCSANOW | TCSADRAIN, &original_termios);
-    if (rc) {
-      avrdude_message(MSG_INFO, "%s: ser_close(): can't reset attributes for device: %s\n",
-                      progname, strerror(errno));
-    }
-    saved_original_termios = 0;
-  }
+  /* FIXME: Should really restore the terminal to original state here. */
 
-  close(fd->ifd);
+  close(fd);
 }
 
 
-static int ser_send(union filedescriptor *fd, const unsigned char * buf, size_t buflen)
+int serial_send(int fd, char * buf, size_t buflen)
 {
-  int rc;
-  const unsigned char * p = buf;
-  size_t len = buflen;
-
-  if (!len)
-    return 0;
-
-  if (verbose > 3)
-  {
-      avrdude_message(MSG_TRACE, "%s: Send: ", progname);
-
-      while (buflen) {
-        unsigned char c = *buf;
-        if (isprint(c)) {
-          avrdude_message(MSG_TRACE, "%c ", c);
-        }
-        else {
-          avrdude_message(MSG_TRACE, ". ");
-        }
-        avrdude_message(MSG_TRACE, "[%02x] ", c);
-
-        buf++;
-        buflen--;
-      }
-
-      avrdude_message(MSG_TRACE, "\n");
-  }
-
-  while (len) {
-    rc = write(fd->ifd, p, (len > 1024) ? 1024 : len);
-    if (rc < 0) {
-      avrdude_message(MSG_INFO, "%s: ser_send(): write error: %s\n",
-              progname, strerror(errno));
-      return -1;
-    }
-    p += rc;
-    len -= rc;
-  }
-
-  return 0;
-}
-
-
-static int ser_recv(union filedescriptor *fd, unsigned char * buf, size_t buflen)
-{
-  struct timeval timeout, to2;
-  fd_set rfds;
+  struct timeval timeout;
+  fd_set wfds;
   int nfds;
   int rc;
-  unsigned char * p = buf;
-  size_t len = 0;
 
-  timeout.tv_sec  = serial_recv_timeout / 1000L;
-  timeout.tv_usec = (serial_recv_timeout % 1000L) * 1000;
-  to2 = timeout;
+  if (!buflen)
+    return 0;
 
-  while (len < buflen) {
+  timeout.tv_sec = 0;
+  timeout.tv_usec = 500000;
+
+  while (buflen) {
+    FD_ZERO(&wfds);
+    FD_SET(fd, &wfds);
+
   reselect:
-    FD_ZERO(&rfds);
-    FD_SET(fd->ifd, &rfds);
-
-    nfds = select(fd->ifd + 1, &rfds, NULL, NULL, &to2);
+    nfds = select(fd+1, NULL, &wfds, NULL, &timeout);
     if (nfds == 0) {
-      avrdude_message(MSG_NOTICE2, "%s: ser_recv(): programmer is not responding\n",
-                        progname);
-      return -1;
+      fprintf(stderr,
+              "%s: serial_send(): programmer is not responding\n",
+              progname);
+      exit(1);
     }
     else if (nfds == -1) {
-      if (errno == EINTR || errno == EAGAIN) {
-	avrdude_message(MSG_INFO, "%s: ser_recv(): programmer is not responding,reselecting\n",
-                        progname);
+      if (errno == EINTR) {
         goto reselect;
       }
       else {
-        avrdude_message(MSG_INFO, "%s: ser_recv(): select(): %s\n",
+        fprintf(stderr, "%s: serial_send(): select(): %s\n",
                 progname, strerror(errno));
-        return -1;
+        exit(1);
       }
     }
 
-    rc = read(fd->ifd, p, (buflen - len > 1024) ? 1024 : buflen - len);
+    rc = write(fd, buf, 1);
     if (rc < 0) {
-      avrdude_message(MSG_INFO, "%s: ser_recv(): read error: %s\n",
+      fprintf(stderr, "%s: serial_send(): write error: %s\n",
               progname, strerror(errno));
-      return -1;
+      exit(1);
     }
-    p += rc;
-    len += rc;
-  }
-
-  p = buf;
-
-  if (verbose > 3)
-  {
-      avrdude_message(MSG_TRACE, "%s: Recv: ", progname);
-
-      while (len) {
-        unsigned char c = *p;
-        if (isprint(c)) {
-          avrdude_message(MSG_TRACE, "%c ", c);
-        }
-        else {
-          avrdude_message(MSG_TRACE, ". ");
-        }
-        avrdude_message(MSG_TRACE, "[%02x] ", c);
-
-        p++;
-        len--;
-      }
-      avrdude_message(MSG_TRACE, "\n");
+    buf++;
+    buflen--;
   }
 
   return 0;
 }
 
 
-static int ser_drain(union filedescriptor *fd, int display)
+int serial_recv(int fd, char * buf, size_t buflen)
+{
+  struct timeval timeout;
+  fd_set rfds;
+  int nfds;
+  int rc;
+
+  timeout.tv_sec  = 5;
+  timeout.tv_usec = 0;
+
+  while (buflen) {
+    FD_ZERO(&rfds);
+    FD_SET(fd, &rfds);
+
+  reselect:
+    nfds = select(fd+1, &rfds, NULL, NULL, &timeout);
+    if (nfds == 0) {
+      fprintf(stderr, 
+              "%s: serial_recv(): programmer is not responding\n",
+              progname);
+      exit(1);
+    }
+    else if (nfds == -1) {
+      if (errno == EINTR) {
+        goto reselect;
+      }
+      else {
+        fprintf(stderr, "%s: serial_recv(): select(): %s\n",
+                progname, strerror(errno));
+        exit(1);
+      }
+    }
+
+    rc = read(fd, buf, 1);
+    if (rc < 0) {
+      fprintf(stderr, "%s: serial_recv(): read error: %s\n",
+              progname, strerror(errno));
+      exit(1);
+    }
+    buf++;
+    buflen--;
+  }
+
+  return 0;
+}
+
+
+int serial_drain(int fd, int display)
 {
   struct timeval timeout;
   fd_set rfds;
@@ -515,18 +256,18 @@ static int ser_drain(union filedescriptor *fd, int display)
   timeout.tv_usec = 250000;
 
   if (display) {
-    avrdude_message(MSG_INFO, "drain>");
+    fprintf(stderr, "drain>");
   }
 
   while (1) {
     FD_ZERO(&rfds);
-    FD_SET(fd->ifd, &rfds);
+    FD_SET(fd, &rfds);
 
   reselect:
-    nfds = select(fd->ifd + 1, &rfds, NULL, NULL, &timeout);
+    nfds = select(fd+1, &rfds, NULL, NULL, &timeout);
     if (nfds == 0) {
       if (display) {
-        avrdude_message(MSG_INFO, "<drain\n");
+        fprintf(stderr, "<drain\n");
       }
       
       break;
@@ -536,38 +277,22 @@ static int ser_drain(union filedescriptor *fd, int display)
         goto reselect;
       }
       else {
-        avrdude_message(MSG_INFO, "%s: ser_drain(): select(): %s\n",
+        fprintf(stderr, "%s: serial_drain(): select(): %s\n",
                 progname, strerror(errno));
-        return -1;
+        exit(1);
       }
     }
 
-    rc = read(fd->ifd, &buf, 1);
+    rc = read(fd, &buf, 1);
     if (rc < 0) {
-      avrdude_message(MSG_INFO, "%s: ser_drain(): read error: %s\n",
+      fprintf(stderr, "%s: serial_drain(): read error: %s\n",
               progname, strerror(errno));
-      return -1;
+      exit(1);
     }
     if (display) {
-      avrdude_message(MSG_INFO, "%02x ", buf);
+      fprintf(stderr, "%02x ", buf);
     }
   }
 
   return 0;
 }
-
-struct serial_device serial_serdev =
-{
-  .open = ser_open,
-  .setspeed = ser_setspeed,
-  .close = ser_close,
-  .send = ser_send,
-  .recv = ser_recv,
-  .drain = ser_drain,
-  .set_dtr_rts = ser_set_dtr_rts,
-  .flags = SERDEV_FL_CANSETSPEED,
-};
-
-struct serial_device *serdev = &serial_serdev;
-
-#endif  /* WIN32NATIVE */

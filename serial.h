@@ -19,40 +19,24 @@
 
 /* $Id$ */
 
-/*
- * Posix serial interface for avrdude.
- */
+/* This is the API for the generic serial interface. The implementations are
+   actually provided by the target dependant files:
 
-extern char *progname;
+   ser_posix.c : posix serial interface.
+   ser_win32.c : native win32 serial interface.
 
-#if 0
+   The target file will be selected at configure time. */
 
-int serial_open(char * port, int baud)
-{
-  return fd;
-}
+#ifndef __serial_h__
+#define __serial_h__
 
+#include "config.h"
 
-void serial_close(int fd)
-{
-}
+extern int serial_open(char * port, int baud);
+extern void serial_close(int fd);
 
+extern int serial_send(int fd, char * buf, size_t buflen);
+extern int serial_recv(int fd, char * buf, size_t buflen);
+extern int serial_drain(int fd, int display);
 
-int serial_send(int fd, char * buf, size_t buflen)
-{
-  return 0;
-}
-
-
-int serial_recv(int fd, char * buf, size_t buflen)
-{
-  return 0;
-}
-
-
-int serial_drain(int fd, int display)
-{
-  return 0;
-}
-
-#endif
+#endif /* __serial_h__ */

@@ -1,6 +1,6 @@
 /*
  * avrdude - A Downloader/Uploader for AVR device programmers
- * Copyright (C) 2003-2004  Theodore A. Roth  <troth@openavr.org>
+ * Copyright (C) 2003  Theodore A. Roth  <troth@openavr.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -13,23 +13,17 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /* $Id$ */
 
-#ifndef avr910_h
-#define avr910_h
+#ifndef __avr910_h__
+#define __avr910_h__
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "config.h"
 
-extern const char avr910_desc[];
 void avr910_initpgm (PROGRAMMER * pgm);
 
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* avr910_h */
+#endif /* __avr910_h__ */
