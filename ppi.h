@@ -24,10 +24,15 @@
 
 #include "config.h"
 
+/*
+ * PPI registers
+ */
+enum {
+  PPIDATA,
+  PPICTRL,
+  PPISTATUS
+};
 
-void ppi_initpgm        (PROGRAMMER * pgm);
-
-int ppi_getpinmask(int pin);
 
 #if !defined(ppi_claim)
 #  define ppi_claim(pgm)
@@ -36,6 +41,22 @@ int ppi_getpinmask(int pin);
 #if !defined(ppi_release)
 #  define ppi_release(pgm)
 #endif
+
+int ppi_get       (int fd, int reg, int bit);
+
+int ppi_set       (int fd, int reg, int bit);
+
+int ppi_clr       (int fd, int reg, int bit);
+
+int ppi_getall    (int fd, int reg);
+
+int ppi_setall    (int fd, int reg, int val);
+
+int ppi_toggle    (int fd, int reg, int bit);
+
+int ppi_open      (char * port);
+
+void ppi_close    (int fd);
 
 #endif
 
