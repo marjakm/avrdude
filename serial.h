@@ -30,7 +30,10 @@
 #ifndef __serial_h__
 #define __serial_h__
 
+extern long serial_recv_timeout;
+
 extern int serial_open(char * port, long baud);
+extern int serial_setattr(int fd, long baud);
 extern void serial_close(int fd);
 
 extern int serial_send(int fd, char * buf, size_t buflen);
