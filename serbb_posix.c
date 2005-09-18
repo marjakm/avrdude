@@ -2,7 +2,6 @@
  * avrdude - A Downloader/Uploader for AVR device programmers
  * Copyright (C) 2000, 2001, 2002, 2003  Brian S. Dean <bsd@bsdhome.com>
  * Copyright (C) 2005 Michael Holzt <kju-avr@fqdn.org>
- * Copyright (C) 2006 Joerg Wunsch <j@uriah.heep.sax.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,7 +14,8 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 /* $Id$ */
 
@@ -36,45 +36,39 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 
-#include "avrdude.h"
-#include "libavrdude.h"
-
+#include "avr.h"
+#include "pindefs.h"
+#include "pgm.h"
 #include "bitbang.h"
-#include "serbb.h"
 
 #undef DEBUG
 
-static struct termios oldmode;
+extern char *progname;
+struct termios oldmode;
 
 /*
   serial port/pin mapping
 
   1	cd	<-
-  2	(rxd)	<-
+  2	rxd	<-
   3	txd	->
   4	dtr	->
-  5	GND
-  6	dsr	<-
-  7	rts	->
-  8	cts	<-
-  9	ri	<-
+  5	dsr	<-
+  6	rts	->
+  7	cts	<-
 */
 
-#define DB9PINS 9
-
-static int serregbits[DB9PINS + 1] =
-{ 0, TIOCM_CD, 0, 0, TIOCM_DTR, 0, TIOCM_DSR, TIOCM_RTS, TIOCM_CTS, TIOCM_RI };
+int serregbits[] =
+{ TIOCM_CD, 0, 0, TIOCM_DTR, TIOCM_DSR, TIOCM_RTS, TIOCM_CTS };
 
 #ifdef DEBUG
-static char *serpins[DB9PINS + 1] =
-  { "NONE", "CD", "RXD", "TXD", "DTR", "GND", "DSR", "RTS", "CTS", "RI" };
+char *serpins[7] =
+  { "CD", "RXD", "TXD ~RESET", "DTR MOSI", "DSR", "RTS SCK", "CTS MISO" };
 #endif
 
-static int serbb_setpin(PROGRAMMER * pgm, int pinfunc, int value)
+void serbb_setpin(int fd, int pin, int value)
 {
   unsigned int	ctl;
-  int           r;
-  int pin = pgm->pinno[pinfunc]; // get its value
 
   if (pin & PIN_INVERSE)
   {
@@ -82,8 +76,10 @@ static int serbb_setpin(PROGRAMMER * pgm, int pinfunc, int value)
     pin   &= PIN_MASK;
   }
 
-  if ( pin < 1 || pin > DB9PINS )
-    return -1;
+  if ( pin < 1 || pin > 7 )
+    return;
+
+  pin--;
 
 #ifdef DEBUG
   printf("%s to %d\n",serpins[pin],value);
@@ -91,48 +87,28 @@ static int serbb_setpin(PROGRAMMER * pgm, int pinfunc, int value)
 
   switch ( pin )
   {
-    case 3:  /* txd */
-	     r = ioctl(pgm->fd.ifd, value ? TIOCSBRK : TIOCCBRK, 0);
-	     if (r < 0) {
-	       perror("ioctl(\"TIOCxBRK\")");
-	       return -1;
-	     }
-             break;
+    case 2:  /* txd */
+             ioctl(fd, value ? TIOCSBRK : TIOCCBRK, 0);
+             return;
 
-    case 4:  /* dtr */
-    case 7:  /* rts */
-             r = ioctl(pgm->fd.ifd, TIOCMGET, &ctl);
- 	     if (r < 0) {
-	       perror("ioctl(\"TIOCMGET\")");
-	       return -1;
- 	     }
+    case 3:  /* dtr, rts */
+    case 5:  ioctl(fd, TIOCMGET, &ctl);
              if ( value )
                ctl |= serregbits[pin];
              else
                ctl &= ~(serregbits[pin]);
-	     r = ioctl(pgm->fd.ifd, TIOCMSET, &ctl);
- 	     if (r < 0) {
-	       perror("ioctl(\"TIOCMSET\")");
-	       return -1;
- 	     }
-             break;
+             ioctl(fd, TIOCMSET, &ctl);
+             return;
 
     default: /* impossible */
-             return -1;
+             return;
   }
-
-  if (pgm->ispdelay > 1)
-    bitbang_delay(pgm->ispdelay);
-
-  return 0;
 }
 
-static int serbb_getpin(PROGRAMMER * pgm, int pinfunc)
+int serbb_getpin(int fd, int pin)
 {
   unsigned int	ctl;
   unsigned char invert;
-  int           r;
-  int pin = pgm->pinno[pinfunc]; // get its value
 
   if (pin & PIN_INVERSE)
   {
@@ -141,23 +117,21 @@ static int serbb_getpin(PROGRAMMER * pgm, int pinfunc)
   } else
     invert = 0;
 
-  if ( pin < 1 || pin > DB9PINS )
+  if ( pin < 1 || pin > 7 )
     return(-1);
+
+  pin --;
 
   switch ( pin )
   {
-    case 2:  /* rxd, currently not implemented, FIXME */
+    case 1:  /* rxd, currently not implemented, FIXME */
              return(-1);
 
-    case 1:  /* cd  */
-    case 6:  /* dsr */
-    case 8:  /* cts */
-    case 9:  /* ri  */
-             r = ioctl(pgm->fd.ifd, TIOCMGET, &ctl);
- 	     if (r < 0) {
-	       perror("ioctl(\"TIOCMGET\")");
-	       return -1;
- 	     }
+    case 0:  /* cd, dsr, dtr, rts, cts */
+    case 3:
+    case 4:
+    case 5:
+    case 6:  ioctl(fd, TIOCMGET, &ctl);
              if ( !invert )
              {
 #ifdef DEBUG
@@ -178,122 +152,101 @@ static int serbb_getpin(PROGRAMMER * pgm, int pinfunc)
   }
 }
 
-static int serbb_highpulsepin(PROGRAMMER * pgm, int pinfunc)
+int serbb_highpulsepin(int fd, int pin)
 {
-  int pin = pgm->pinno[pinfunc]; // replace pin name by its value
-
-  if ( (pin & PIN_MASK) < 1 || (pin & PIN_MASK) > DB9PINS )
+  if (pin < 1 || pin > 7)
     return -1;
 
-  serbb_setpin(pgm, pinfunc, 1);
-  serbb_setpin(pgm, pinfunc, 0);
+  serbb_setpin(fd, pin, 1);
+  #if SLOW_TOGGLE
+  usleep(1000);
+  #endif
+  serbb_setpin(fd, pin, 0);
+
+  #if SLOW_TOGGLE
+  usleep(1000);
+  #endif
 
   return 0;
 }
 
 
 
-static void serbb_display(PROGRAMMER *pgm, const char *p)
+void serbb_display(PROGRAMMER *pgm, char *p)
 {
   /* MAYBE */
 }
 
-static void serbb_enable(PROGRAMMER *pgm)
+void serbb_enable(PROGRAMMER *pgm)
 {
   /* nothing */
 }
 
-static void serbb_disable(PROGRAMMER *pgm)
+void serbb_disable(PROGRAMMER *pgm)
 {
   /* nothing */
 }
 
-static void serbb_powerup(PROGRAMMER *pgm)
+void serbb_powerup(PROGRAMMER *pgm)
 {
   /* nothing */
 }
 
-static void serbb_powerdown(PROGRAMMER *pgm)
+void serbb_powerdown(PROGRAMMER *pgm)
 {
   /* nothing */
 }
 
-static int serbb_open(PROGRAMMER *pgm, char *port)
+int serbb_open(PROGRAMMER *pgm, char *port)
 {
   struct termios mode;
   int flags;
-  int r;
-
-  if (bitbang_check_prerequisites(pgm) < 0)
-    return -1;
 
   /* adapted from uisp code */
 
-  pgm->fd.ifd = open(port, O_RDWR | O_NOCTTY | O_NONBLOCK);
+  pgm->fd = open(port, O_RDWR | O_NOCTTY | O_NONBLOCK);
 
-  if (pgm->fd.ifd < 0) {
-    perror(port);
-    return(-1);
-  }
+  if ( pgm->fd > 0 )
+  {
+    tcgetattr(pgm->fd, &mode);
+    oldmode = mode;
 
-  r = tcgetattr(pgm->fd.ifd, &mode);
-  if (r < 0) {
-    avrdude_message(MSG_INFO, "%s: ", port);
-    perror("tcgetattr");
-    return(-1);
-  }
-  oldmode = mode;
+    cfmakeraw(&mode);
+    mode.c_iflag &= ~(INPCK | IXOFF | IXON);
+    mode.c_cflag &= ~(HUPCL | CSTOPB | CRTSCTS);
+    mode.c_cflag |= (CLOCAL | CREAD);
+    mode.c_cc [VMIN] = 1;
+    mode.c_cc [VTIME] = 0;
 
-  mode.c_iflag = IGNBRK | IGNPAR;
-  mode.c_oflag = 0;
-  mode.c_cflag = CLOCAL | CREAD | CS8 | B9600;
-  mode.c_cc [VMIN] = 1;
-  mode.c_cc [VTIME] = 0;
+    tcsetattr(pgm->fd, TCSANOW, &mode);
 
-  r = tcsetattr(pgm->fd.ifd, TCSANOW, &mode);
-  if (r < 0) {
-      avrdude_message(MSG_INFO, "%s: ", port);
-      perror("tcsetattr");
-      return(-1);
-  }
-
-  /* Clear O_NONBLOCK flag.  */
-  flags = fcntl(pgm->fd.ifd, F_GETFL, 0);
-  if (flags == -1)
+    /* Clear O_NONBLOCK flag.  */
+    flags = fcntl(pgm->fd, F_GETFL, 0);
+    if (flags == -1)
     {
-      avrdude_message(MSG_INFO, "%s: Can not get flags: %s\n",
-	      progname, strerror(errno));
+      fprintf(stderr, "%s: Can not get flags\n", progname);
       return(-1);
     }
-  flags &= ~O_NONBLOCK;
-  if (fcntl(pgm->fd.ifd, F_SETFL, flags) == -1)
+    flags &= ~O_NONBLOCK;
+    if (fcntl(pgm->fd, F_SETFL, flags) == -1)
     {
-      avrdude_message(MSG_INFO, "%s: Can not clear nonblock flag: %s\n",
-	      progname, strerror(errno));
+      fprintf(stderr, "%s: Can not clear nonblock flag\n", progname);
       return(-1);
     }
+  }
 
   return(0);
 }
 
-static void serbb_close(PROGRAMMER *pgm)
+void serbb_close(PROGRAMMER *pgm)
 {
-  if (pgm->fd.ifd != -1)
-  {
-	  (void)tcsetattr(pgm->fd.ifd, TCSANOW, &oldmode);
-	  pgm->setpin(pgm, PIN_AVR_RESET, 1);
-	  close(pgm->fd.ifd);
-  }
+  tcsetattr(pgm->fd, TCSADRAIN, &oldmode);
   return;
 }
-
-const char serbb_desc[] = "Serial port bitbanging";
 
 void serbb_initpgm(PROGRAMMER *pgm)
 {
   strcpy(pgm->type, "SERBB");
-
-  pgm_fill_old_pins(pgm); // TODO to be removed if old pin data no longer needed
 
   pgm->rdy_led        = bitbang_rdy_led;
   pgm->err_led        = bitbang_err_led;
@@ -308,14 +261,11 @@ void serbb_initpgm(PROGRAMMER *pgm)
   pgm->program_enable = bitbang_program_enable;
   pgm->chip_erase     = bitbang_chip_erase;
   pgm->cmd            = bitbang_cmd;
-  pgm->cmd_tpi        = bitbang_cmd_tpi;
   pgm->open           = serbb_open;
   pgm->close          = serbb_close;
-  pgm->setpin         = serbb_setpin;
-  pgm->getpin         = serbb_getpin;
-  pgm->highpulsepin   = serbb_highpulsepin;
-  pgm->read_byte      = avr_read_byte_default;
-  pgm->write_byte     = avr_write_byte_default;
+
+  /* this is a serial port bitbang device */
+  pgm->flag           = 1;
 }
 
 #endif  /* WIN32NATIVE */

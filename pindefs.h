@@ -35,6 +35,8 @@ enum {
   PIN_LED_VFY,
   N_PINS
 };
+#define PIN_INVERSE 0x80	/* flag for inverted pin in serbb */
+#define PIN_MASK    0x7f
 
 #define LED_ON(fd,pin)  ppi_setpin(fd,pin,0)
 #define LED_OFF(fd,pin) ppi_setpin(fd,pin,1)
