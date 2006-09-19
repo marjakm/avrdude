@@ -13,7 +13,8 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /* $Id$ */
@@ -31,60 +32,41 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "avrdude.h"
-#include "libavrdude.h"
-
-#include "stk500generic.h"
+#include "pgm.h"
 #include "stk500.h"
 #include "stk500v2.h"
+
+extern char *progname;
 
 static int stk500generic_open(PROGRAMMER * pgm, char * port)
 {
   stk500_initpgm(pgm);
   if (pgm->open(pgm, port) >= 0)
     {
-      avrdude_message(MSG_INFO, "%s: successfully opened stk500v1 device -- please use -c stk500v1\n",
-                      progname);
+      fprintf(stderr,
+	      "%s: successfully opened stk500v1 device -- please use -c stk500v1\n",
+	      progname);
       return 0;
     }
-
-  pgm->close(pgm);
 
   stk500v2_initpgm(pgm);
   if (pgm->open(pgm, port) >= 0)
     {
-      avrdude_message(MSG_INFO, "%s: successfully opened stk500v2 device -- please use -c stk500v2\n",
-                      progname);
+      fprintf(stderr,
+	      "%s: successfully opened stk500v2 device -- please use -c stk500v2\n",
+	      progname);
       return 0;
     }
 
-  avrdude_message(MSG_INFO, "%s: cannot open either stk500v1 or stk500v2 programmer\n",
-                  progname);
+  fprintf(stderr,
+	  "%s: cannot open either stk500v1 or stk500v2 programmer\n",
+	  progname);
   return -1;
 }
-
-static void stk500generic_setup(PROGRAMMER * pgm)
-{
-  /*
-   * Only STK500v2 needs setup/teardown.
-   */
-  stk500v2_initpgm(pgm);
-  pgm->setup(pgm);
-}
-
-static void stk500generic_teardown(PROGRAMMER * pgm)
-{
-  stk500v2_initpgm(pgm);
-  pgm->teardown(pgm);
-}
-
-const char stk500generic_desc[] = "Atmel STK500, autodetect firmware version";
 
 void stk500generic_initpgm(PROGRAMMER * pgm)
 {
   strcpy(pgm->type, "STK500GENERIC");
 
   pgm->open           = stk500generic_open;
-  pgm->setup          = stk500generic_setup;
-  pgm->teardown       = stk500generic_teardown;
 }
