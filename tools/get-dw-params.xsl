@@ -14,7 +14,8 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301
  *
  * $Id$
 -->
@@ -39,8 +40,6 @@
                     select="translate(/AVRPART/ADMIN/PART_NAME,
                                       'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
                                       'abcdefghijklmnopqrstuvwxyz')" />
-      <xsl:variable name="ucEepromInst"
-                    select="//AVRPART/ICE_SETTINGS/JTAGICEmkII/ucEepromInst" />
       <xsl:variable name="ucFlashInst"
                     select="//AVRPART/ICE_SETTINGS/JTAGICEmkII/ucFlashInst" />
 
@@ -60,13 +59,6 @@
       <xsl:text>     flash_instr   = </xsl:text>
       <xsl:call-template name="format-hex">
         <xsl:with-param name="arg" select="$ucFlashInst" />
-        <xsl:with-param name="count" select="0" />
-      </xsl:call-template>
-      <xsl:text>;&#010;</xsl:text>
-
-      <xsl:text>     eeprom_instr  = </xsl:text>
-      <xsl:call-template name="format-hex">
-        <xsl:with-param name="arg" select="$ucEepromInst" />
         <xsl:with-param name="count" select="0" />
       </xsl:call-template>
       <xsl:text>;&#010;</xsl:text>
@@ -111,7 +103,6 @@
     <!-- recursively then until everything has been done -->
     <xsl:template name="format-hex">
       <xsl:param name="arg" />
-      <xsl:param name="count" />
       <xsl:choose>
         <xsl:when test="string-length($arg) &lt;= 4">
           <!-- Last element, print it, and leave template. -->
@@ -127,7 +118,7 @@
           <xsl:value-of select="substring($arg, 1, 4)" />
           <xsl:choose>
             <xsl:when test="$count mod 8 = 7">
-              <xsl:text>,&#010;&#009;             </xsl:text>
+              <xsl:text>,&#010;&#009;      </xsl:text>
             </xsl:when>
             <xsl:otherwise>
               <xsl:text>, </xsl:text>
