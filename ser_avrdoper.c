@@ -15,7 +15,8 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /* $Id$ */
@@ -30,10 +31,8 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
 
-#include "avrdude.h"
-#include "libavrdude.h"
+#include "serial.h"
 
 /* ------------------------------------------------------------------------ */
 
@@ -54,6 +53,9 @@
 #define USB_VENDOR_ID   0x16c0
 #define USB_PRODUCT_ID  0x05df
 
+extern char *progname;
+extern int verbose;
+
 static int  reportDataSizes[4] = {13, 29, 61, 125};
 
 static unsigned char    avrdoperRxBuffer[280];  /* buffer for receive data */
@@ -64,7 +66,7 @@ static int              avrdoperRxPosition = 0; /* amount of bytes already consu
 /* ------------------------------------------------------------------------ */
 /* ------------------------------------------------------------------------ */
 
-#if defined(WIN32NATIVE) && defined(HAVE_LIBHID)
+#ifdef WIN32NATIVE
 
 #include <windows.h>
 #include <setupapi.h>
@@ -92,7 +94,6 @@ static void convertUniToAscii(char *buffer)
     while(*uni != 0){
         if(*uni >= 256){
             *ascii++ = '?';
-            uni++;
         }else{
             *ascii++ = *uni++;
         }
@@ -178,7 +179,6 @@ static int usbOpenDevice(union filedescriptor *fdp, int vendor, char *vendorName
         free(deviceDetails);
     if(handle != INVALID_HANDLE_VALUE){
 	fdp->pfd = (void *)handle;
-	errorCode = 0;
     }
     return errorCode;
 }
@@ -241,19 +241,13 @@ static int usbGetReport(union filedescriptor *fdp, int reportType, int reportNum
 /* ------------------------------------------------------------------------ */
 /* ------------------------------------------------------------------------ */
 
-#else /* !(WIN32NATIVE && HAVE_LIBHID) */
+#else /* !WIN32NATIVE */
 
 /* ------------------------------------------------------------------------ */
 /* ------------------------------------------------------------------------ */
 /* ------------------------------------------------------------------------ */
 
-#if defined(HAVE_USB_H)
-#  include <usb.h>
-#elif defined(HAVE_LUSB0_USB_H)
-#  include <lusb0_usb.h>
-#else
-#  error "libusb needs either <usb.h> or <lusb0_usb.h>"
-#endif
+#include <usb.h>
 
 /* ------------------------------------------------------------------------- */
 
@@ -313,7 +307,7 @@ static int usbOpenDevice(union filedescriptor *fdp, int vendor, char *vendorName
                 handle = usb_open(dev); /* we need to open the device in order to query strings */
                 if(!handle){
                     errorCode = USB_ERROR_ACCESS;
-                    avrdude_message(MSG_INFO, "Warning: cannot open USB device: %s\n",
+                    fprintf(stderr, "Warning: cannot open USB device: %s\n",
 			    usb_strerror());
                     continue;
                 }
@@ -325,21 +319,23 @@ static int usbOpenDevice(union filedescriptor *fdp, int vendor, char *vendorName
 					0x0409, string, sizeof(string));
                 if(len < 0){
                     errorCode = USB_ERROR_IO;
-                    avrdude_message(MSG_INFO, "Warning: cannot query manufacturer for device: %s\n",
-                                    usb_strerror());
+                    fprintf(stderr,
+			    "Warning: cannot query manufacturer for device: %s\n",
+			    usb_strerror());
                 }else{
                     errorCode = USB_ERROR_NOTFOUND;
-                    /* avrdude_message(MSG_INFO, "seen device from vendor ->%s<-\n", string); */
+                    /* fprintf(stderr, "seen device from vendor ->%s<-\n", string); */
                     if(strcmp(string, vendorName) == 0){
                         len = usbGetStringAscii(handle, dev->descriptor.iProduct,
 						0x0409, string, sizeof(string));
                         if(len < 0){
                             errorCode = USB_ERROR_IO;
-                            avrdude_message(MSG_INFO, "Warning: cannot query product for device: %s\n",
-                                            usb_strerror());
+                            fprintf(stderr,
+				    "Warning: cannot query product for device: %s\n",
+				    usb_strerror());
                         }else{
                             errorCode = USB_ERROR_NOTFOUND;
-                            /* avrdude_message(MSG_INFO, "seen product ->%s<-\n", string); */
+                            /* fprintf(stderr, "seen product ->%s<-\n", string); */
                             if(strcmp(string, productName) == 0)
                                 break;
                         }
@@ -355,7 +351,7 @@ static int usbOpenDevice(union filedescriptor *fdp, int vendor, char *vendorName
     if(handle != NULL){
         int rval, retries = 3;
         if(usb_set_configuration(handle, 1)){
-            avrdude_message(MSG_INFO, "Warning: could not set configuration: %s\n",
+            fprintf(stderr, "Warning: could not set configuration: %s\n",
 		    usb_strerror());
         }
         /* now try to claim the interface and detach the kernel HID driver on
@@ -364,13 +360,13 @@ static int usbOpenDevice(union filedescriptor *fdp, int vendor, char *vendorName
         while((rval = usb_claim_interface(handle, 0)) != 0 && retries-- > 0){
 #ifdef LIBUSB_HAS_DETACH_KERNEL_DRIVER_NP
             if(usb_detach_kernel_driver_np(handle, 0) < 0){
-                avrdude_message(MSG_INFO, "Warning: could not detach kernel HID driver: %s\n",
+                fprintf(stderr, "Warning: could not detach kernel HID driver: %s\n",
 			usb_strerror());
             }
 #endif
         }
         if(rval != 0)
-            avrdude_message(MSG_INFO, "Warning: could not claim interface\n");
+            fprintf(stderr, "Warning: could not claim interface\n");
 /* Continue anyway, even if we could not claim the interface. Control transfers
  * should still work.
  */
@@ -403,7 +399,7 @@ static int usbSetReport(union filedescriptor *fdp, int reportType, char *buffer,
 				reportType << 8 | buffer[0], 0, buffer, len, 5000);
     if(bytesSent != len){
         if(bytesSent < 0)
-            avrdude_message(MSG_INFO, "Error sending message: %s\n", usb_strerror());
+            fprintf(stderr, "Error sending message: %s\n", usb_strerror());
         return USB_ERROR_IO;
     }
     return 0;
@@ -424,13 +420,13 @@ static int usbGetReport(union filedescriptor *fdp, int reportType, int reportNum
 				    USB_RECIP_INTERFACE | USB_ENDPOINT_IN, USBRQ_HID_GET_REPORT,
 				    reportType << 8 | reportNumber, 0, buffer, maxLen, 5000);
     if(bytesReceived < 0){
-        avrdude_message(MSG_INFO, "Error sending message: %s\n", usb_strerror());
+        fprintf(stderr, "Error sending message: %s\n", usb_strerror());
         return USB_ERROR_IO;
     }
     *len = bytesReceived;
     if(!usesReportIDs){
         buffer[-1] = reportNumber;  /* add dummy report ID */
-        len++;
+        *len++;
     }
     return 0;
 }
@@ -443,16 +439,16 @@ static int usbGetReport(union filedescriptor *fdp, int reportType, int reportNum
 
 /* ------------------------------------------------------------------------- */
 
-static void dumpBlock(const char *prefix, const unsigned char *buf, int len)
+static void dumpBlock(char *prefix, unsigned char *buf, int len)
 {
     int i;
 
     if(len <= 8){   /* more compact format for short blocks */
-        avrdude_message(MSG_INFO, "%s: %d bytes: ", prefix, len);
+        fprintf(stderr, "%s: %d bytes: ", prefix, len);
         for(i = 0; i < len; i++){
-            avrdude_message(MSG_INFO, "%02x ", buf[i]);
+            fprintf(stderr, "%02x ", buf[i]);
         }
-        avrdude_message(MSG_INFO, " \"");
+        fprintf(stderr, " \"");
         for(i = 0; i < len; i++){
             if(buf[i] >= 0x20 && buf[i] < 0x7f){
                 fputc(buf[i], stderr);
@@ -460,20 +456,20 @@ static void dumpBlock(const char *prefix, const unsigned char *buf, int len)
                 fputc('.', stderr);
             }
         }
-        avrdude_message(MSG_INFO, "\"\n");
+        fprintf(stderr, "\"\n");
     }else{
-        avrdude_message(MSG_INFO, "%s: %d bytes:\n", prefix, len);
+        fprintf(stderr, "%s: %d bytes:\n", prefix, len);
         while(len > 0){
             for(i = 0; i < 16; i++){
                 if(i < len){
-                    avrdude_message(MSG_INFO, "%02x ", buf[i]);
+                    fprintf(stderr, "%02x ", buf[i]);
                 }else{
-                    avrdude_message(MSG_INFO, "   ");
+                    fprintf(stderr, "   ");
                 }
                 if(i == 7)
                     fputc(' ', stderr);
             }
-            avrdude_message(MSG_INFO, "  \"");
+            fprintf(stderr, "  \"");
             for(i = 0; i < 16; i++){
                 if(i < len){
                     if(buf[i] >= 0x20 && buf[i] < 0x7f){
@@ -483,7 +479,7 @@ static void dumpBlock(const char *prefix, const unsigned char *buf, int len)
                     }
                 }
             }
-            avrdude_message(MSG_INFO, "\"\n");
+            fprintf(stderr, "\"\n");
             buf += 16;
             len -= 16;
         }
@@ -508,7 +504,7 @@ static char *usbErrorText(int usbErrno)
 
 /* ------------------------------------------------------------------------- */
 
-static int avrdoper_open(char *port, union pinfo pinfo, union filedescriptor *fdp)
+static void avrdoper_open(char *port, long baud, union filedescriptor *fdp)
 {
     int rval;
     char *vname = "obdev.at";
@@ -516,10 +512,9 @@ static int avrdoper_open(char *port, union pinfo pinfo, union filedescriptor *fd
 
     rval = usbOpenDevice(fdp, USB_VENDOR_ID, vname, USB_PRODUCT_ID, devname, 1);
     if(rval != 0){
-        avrdude_message(MSG_INFO, "%s: avrdoper_open(): %s\n", progname, usbErrorText(rval));
-        return -1;
+        fprintf(stderr, "%s: avrdoper_open(): %s\n", progname, usbErrorText(rval));
+        exit(1);
     }
-    return 0;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -542,7 +537,7 @@ static int  chooseDataSize(int len)
     return i - 1;
 }
 
-static int avrdoper_send(union filedescriptor *fdp, const unsigned char *buf, size_t buflen)
+static int avrdoper_send(union filedescriptor *fdp, unsigned char *buf, size_t buflen)
 {
     if(verbose > 3)
         dumpBlock("Send", buf, buflen);
@@ -554,12 +549,13 @@ static int avrdoper_send(union filedescriptor *fdp, const unsigned char *buf, si
         buffer[0] = lenIndex + 1;   /* report ID */
         buffer[1] = thisLen;
         memcpy(buffer + 2, buf, thisLen);
-        avrdude_message(MSG_TRACE, "Sending %d bytes data chunk\n", thisLen);
+        if(verbose > 3)
+            fprintf(stderr, "Sending %d bytes data chunk\n", thisLen);
         rval = usbSetReport(fdp, USB_HID_REPORT_TYPE_FEATURE, (char *)buffer,
 			    reportDataSizes[lenIndex] + 2);
         if(rval != 0){
-            avrdude_message(MSG_INFO, "%s: avrdoper_send(): %s\n", progname, usbErrorText(rval));
-            return -1;
+            fprintf(stderr, "%s: avrdoper_send(): %s\n", progname, usbErrorText(rval));
+            exit(1);
         }
         buflen -= thisLen;
         buf += thisLen;
@@ -569,7 +565,7 @@ static int avrdoper_send(union filedescriptor *fdp, const unsigned char *buf, si
 
 /* ------------------------------------------------------------------------- */
 
-static int avrdoperFillBuffer(union filedescriptor *fdp)
+static void avrdoperFillBuffer(union filedescriptor *fdp)
 {
     int bytesPending = reportDataSizes[1];  /* guess how much data is buffered in device */
 
@@ -584,23 +580,24 @@ static int avrdoperFillBuffer(union filedescriptor *fdp)
         usbErr = usbGetReport(fdp, USB_HID_REPORT_TYPE_FEATURE, lenIndex + 1,
 			      (char *)buffer, &len);
         if(usbErr != 0){
-            avrdude_message(MSG_INFO, "%s: avrdoperFillBuffer(): %s\n", progname, usbErrorText(usbErr));
-            return -1;
+            fprintf(stderr, "%s: avrdoperFillBuffer(): %s\n", progname, usbErrorText(usbErr));
+            exit(1);
         }
-        avrdude_message(MSG_TRACE, "Received %d bytes data chunk of total %d\n", len - 2, buffer[1]);
+        if(verbose > 3)
+            fprintf(stderr, "Received %d bytes data chunk of total %d\n", len - 2, buffer[1]);
         len -= 2;   /* compensate for report ID and length byte */
         bytesPending = buffer[1] - len; /* amount still buffered */
         if(len > buffer[1])             /* cut away padding */
             len = buffer[1];
         if(avrdoperRxLength + len > sizeof(avrdoperRxBuffer)){
-            avrdude_message(MSG_INFO, "%s: avrdoperFillBuffer(): internal error: buffer overflow\n",
-                            progname);
-            return -1;
+            fprintf(stderr,
+		    "%s: avrdoperFillBuffer(): internal error: buffer overflow\n",
+		    progname);
+            exit(1);
         }
         memcpy(avrdoperRxBuffer + avrdoperRxLength, buffer + 2, len);
         avrdoperRxLength += len;
     }
-    return 0;
 }
 
 static int avrdoper_recv(union filedescriptor *fdp, unsigned char *buf, size_t buflen)
@@ -611,8 +608,7 @@ static int avrdoper_recv(union filedescriptor *fdp, unsigned char *buf, size_t b
     while(remaining > 0){
         int len, available = avrdoperRxLength - avrdoperRxPosition;
         if(available <= 0){ /* buffer is empty */
-            if (avrdoperFillBuffer(fdp) < 0)
-                return -1;
+            avrdoperFillBuffer(fdp);
             continue;
         }
         len = remaining < available ? remaining : available;
@@ -631,18 +627,9 @@ static int avrdoper_recv(union filedescriptor *fdp, unsigned char *buf, size_t b
 static int avrdoper_drain(union filedescriptor *fdp, int display)
 {
     do{
-        if (avrdoperFillBuffer(fdp) < 0)
-            return -1;
+        avrdoperFillBuffer(fdp);
     }while(avrdoperRxLength > 0);
     return 0;
-}
-
-/* ------------------------------------------------------------------------- */
-
-static int avrdoper_set_dtr_rts(union filedescriptor *fdp, int is_on)
-{
-	avrdude_message(MSG_INFO, "%s: AVR-Doper doesn't support DTR/RTS setting\n", progname);
-    return -1;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -654,7 +641,6 @@ struct serial_device avrdoper_serdev =
   .send = avrdoper_send,
   .recv = avrdoper_recv,
   .drain = avrdoper_drain,
-  .set_dtr_rts = avrdoper_set_dtr_rts,
   .flags = SERDEV_FL_NONE,
 };
 
