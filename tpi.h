@@ -13,7 +13,8 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /* $Id$ */
@@ -28,12 +29,9 @@ extern "C" {
 static const unsigned char tpi_skey[] = { 0x12, 0x89, 0xAB, 0x45, 0xCD, 0xD8, 0x88, 0xFF };
 
 /* registers */
-#define TPI_REG_TPIIR  0x0F
-
-#define TPI_IDENT_CODE 0x80
-
-#define TPI_REG_TPIPCR 0x02
-#define TPI_REG_TPISR  0x00
+#define TPI_REG_TPIIR	0x0F
+#define TPI_REG_TPIPCR	0x02
+#define TPI_REG_TPISR	0x00
 
 #define TPI_REG_TPISR_NVMEN		(1 << 1)
 
@@ -65,8 +63,6 @@ static const unsigned char tpi_skey[] = { 0x12, 0x89, 0xAB, 0x45, 0xCD, 0xD8, 0x
 #define TPI_NVMCMD_CHIP_ERASE		0x10
 #define TPI_NVMCMD_SECTION_ERASE	0x14
 #define TPI_NVMCMD_WORD_WRITE		0x1D
-
-static const unsigned char tpi_skey_cmd[] = { TPI_CMD_SKEY, 0xff, 0x88, 0xd8, 0xcd, 0x45, 0xab, 0x89, 0x12 };
 
 #ifdef __cplusplus
 }
