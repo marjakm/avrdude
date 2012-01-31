@@ -14,7 +14,8 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /* $Id: pgm.c 976 2011-08-23 21:03:36Z joerg_wunsch $ */
@@ -26,22 +27,17 @@
 #include <string.h>
 
 #include "avrdude.h"
-#include "libavrdude.h"
+#include "pgm_type.h"
 
 #include "arduino.h"
+#include "avr.h"
 #include "avr910.h"
 #include "avrftdi.h"
 #include "buspirate.h"
 #include "butterfly.h"
-#include "flip1.h"
-#include "flip2.h"
-#include "ft245r.h"
 #include "jtagmkI.h"
 #include "jtagmkII.h"
-#include "jtag3.h"
-#include "linuxgpio.h"
 #include "par.h"
-#include "pickit2.h"
 #include "ppi.h"
 #include "serbb.h"
 #include "stk500.h"
@@ -52,12 +48,11 @@
 #include "wiring.h"
 
 
-const PROGRAMMER_TYPE programmers_types[] = {
+const PROGRAMMER_TYPE const programmers_types[] = {
         {"arduino", arduino_initpgm, arduino_desc},
         {"avr910", avr910_initpgm, avr910_desc},
         {"avrftdi", avrftdi_initpgm, avrftdi_desc},
         {"buspirate", buspirate_initpgm, buspirate_desc},
-        {"buspirate_bb", buspirate_bb_initpgm, buspirate_bb_desc},
         {"butterfly", butterfly_initpgm, butterfly_desc},
         {"butterfly_mk", butterfly_mk_initpgm, butterfly_mk_desc},
         {"dragon_dw", jtagmkII_dragon_dw_initpgm, jtagmkII_dragon_dw_desc},
@@ -66,22 +61,13 @@ const PROGRAMMER_TYPE programmers_types[] = {
         {"dragon_jtag", jtagmkII_dragon_initpgm, jtagmkII_dragon_desc},
         {"dragon_pdi", jtagmkII_dragon_pdi_initpgm, jtagmkII_dragon_pdi_desc},
         {"dragon_pp", stk500v2_dragon_pp_initpgm, stk500v2_dragon_pp_desc},
-        {"flip1", flip1_initpgm, flip1_desc},
-        {"flip2", flip2_initpgm, flip2_desc},
-        {"ftdi_syncbb", ft245r_initpgm, ft245r_desc},
         {"jtagmki", jtagmkI_initpgm, jtagmkI_desc},
         {"jtagmkii", jtagmkII_initpgm, jtagmkII_desc},
         {"jtagmkii_avr32", jtagmkII_avr32_initpgm, jtagmkII_avr32_desc},
         {"jtagmkii_dw", jtagmkII_dw_initpgm, jtagmkII_dw_desc},
         {"jtagmkii_isp", stk500v2_jtagmkII_initpgm, stk500v2_jtagmkII_desc},
         {"jtagmkii_pdi", jtagmkII_pdi_initpgm, jtagmkII_pdi_desc},
-        {"jtagice3", jtag3_initpgm, jtag3_desc},
-        {"jtagice3_pdi", jtag3_pdi_initpgm, jtag3_pdi_desc},
-        {"jtagice3_dw", jtag3_dw_initpgm, jtag3_dw_desc},
-        {"jtagice3_isp", stk500v2_jtag3_initpgm, stk500v2_jtag3_desc},
-        {"linuxgpio", linuxgpio_initpgm, linuxgpio_desc},
         {"par", par_initpgm, par_desc},
-        {"pickit2", pickit2_initpgm, pickit2_desc},
         {"serbb", serbb_initpgm, serbb_desc},
         {"stk500", stk500_initpgm, stk500_desc},
         {"stk500generic", stk500generic_initpgm, stk500generic_desc},
