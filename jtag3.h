@@ -25,7 +25,6 @@
 extern "C" {
 #endif
 
-int  jtag3_open_common(PROGRAMMER * pgm, char * port);
 int  jtag3_send(PROGRAMMER * pgm, unsigned char * data, size_t len);
 int  jtag3_recv(PROGRAMMER * pgm, unsigned char **msg);
 void jtag3_close(PROGRAMMER * pgm);
@@ -33,11 +32,6 @@ int  jtag3_getsync(PROGRAMMER * pgm, int mode);
 int  jtag3_getparm(PROGRAMMER * pgm, unsigned char scope,
 		   unsigned char section, unsigned char parm,
 		   unsigned char *value, unsigned char length);
-int jtag3_setparm(PROGRAMMER * pgm, unsigned char scope,
-		  unsigned char section, unsigned char parm,
-		  unsigned char *value, unsigned char length);
-int jtag3_command(PROGRAMMER *pgm, unsigned char *cmd, unsigned int cmdlen,
-		  unsigned char **resp, const char *descr);
 extern const char jtag3_desc[];
 extern const char jtag3_dw_desc[];
 extern const char jtag3_pdi_desc[];

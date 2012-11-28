@@ -109,8 +109,6 @@
 #define CMD3_GET_PARAMETER         0x02
 #define CMD3_SIGN_ON               0x10
 #define CMD3_SIGN_OFF              0x11 /* takes one parameter? */
-#define CMD3_START_DW_DEBUG        0x13
-#define CMD3_MONCON_DISABLE        0x17
 
 /* AVR ISP scope: no commands of its own */
 
@@ -136,13 +134,9 @@
 #define RSP3_STATUS_MASK           0xE0
 
 /* possible failure codes that could be appended to RSP3_FAILED: */
-#  define RSP3_FAIL_DEBUGWIRE           0x10
-#  define RSP3_FAIL_PDI                 0x1B
 #  define RSP3_FAIL_NO_ANSWER           0x20
 #  define RSP3_FAIL_NO_TARGET_POWER     0x22
 #  define RSP3_FAIL_WRONG_MODE          0x32 /* progmode vs. non-prog */
-#  define RSP3_FAIL_UNSUPP_MEMORY       0x34 /* unsupported memory type */
-#  define RSP3_FAIL_WRONG_LENGTH        0x35 /* wrong lenth for mem access */
 #  define RSP3_FAIL_NOT_UNDERSTOOD      0x91
 
 /* ICE events */
@@ -162,7 +156,6 @@
 #define MTYPE_OSCCAL_BYTE 0xB5	/* osccal cells in programming mode */
 #define MTYPE_FLASH       0xc0	/* xmega (app.) flash - undocumented in AVR067 */
 #define MTYPE_BOOT_FLASH  0xc1	/* xmega boot flash - undocumented in AVR067 */
-#define MTYPE_EEPROM_XMEGA 0xc4	/* xmega EEPROM in debug mode - undocumented in AVR067 */
 #define MTYPE_USERSIG     0xc5	/* xmega user signature - undocumented in AVR067 */
 #define MTYPE_PRODSIG     0xc6	/* xmega production signature - undocumented in AVR067 */
 
@@ -221,47 +214,6 @@
 #define XMEGA_ERASE_BOOT_PAGE   0x05
 #define XMEGA_ERASE_EEPROM_PAGE 0x06
 #define XMEGA_ERASE_USERSIG     0x07
-
-/* EDBG vendor commands */
-#define EDBG_VENDOR_AVR_CMD     0x80
-#define EDBG_VENDOR_AVR_RSP     0x81
-#define EDBG_VENDOR_AVR_EVT     0x82
-
-/* CMSIS-DAP commands */
-#define CMSISDAP_CMD_INFO       0x00 /* get info, followed by INFO byte */
-#  define CMSISDAP_INFO_VID         0x01 /* vendor ID (string) */
-#  define CMSISDAP_INFO_PID         0x02 /* product ID (string) */
-#  define CMSISDAP_INFO_SERIAL      0x03 /* serial number (string) */
-#  define CMSISDAP_INFO_FIRMWARE    0x04 /* firmware version (string) */
-#  define CMSISDAP_INFO_TARGET_VENDOR 0x05 /* target device vendor (string) */
-#  define CMSISDAP_INFO_TARGET_NAME   0x06 /* target device name (string) */
-#  define CMSISDAP_INFO_CAPABILITIES  0xF0 /* debug unit capabilities (byte) */
-#  define CMSISDAP_INFO_PACKET_COUNT  0xFE /* packet count (byte) (which packets, anyway?) */
-#  define CMSISDAP_INFO_PACKET_SIZE   0xFF /* packet size (short) */
-
-#define CMSISDAP_CMD_LED        0x01 /* LED control, followed by LED number and on/off byte */
-#  define CMSISDAP_LED_CONNECT      0x00 /* connect LED */
-#  define CMSISDAP_LED_RUNNING      0x01 /* running LED */
-
-#define CMSISDAP_CMD_CONNECT    0x02 /* connect to target, followed by DAP mode */
-#  define CMSISDAP_CONN_DEFAULT     0x00
-#  define CMSISDAP_CONN_SWD         0x01 /* serial wire debug */
-#  define CMSISDAP_CONN_JTAG        0x02 /* JTAG mode */
-
-#define CMSISDAP_CMD_DISCONNECT 0x03 /* disconnect from target */
-
-#define CMSISDAP_XFR_CONFIGURE  0x04 /* configure transfers; idle cycles (byte);
-                                        wait retry (short); match retry (short) */
-
-#define CMSISDAP_CMD_WRITEAPBORT 0x08 /* write to CoreSight ABORT register of target */
-
-#define CMSISDAP_CMD_DELAY      0x09 /* delay for number of microseconds (short) */
-
-#define CMSISDAP_CMD_RESET      0x0A /* reset target */
-
-#define CMSISDAP_CMD_SWJ_CLOCK  0x11 /* SWD/JTAG clock, (word) */
-
-#define CMSISDAP_CMD_SWD_CONFIGURE 0x13 /* configure SWD protocol; (byte) */
 
 #if !defined(JTAG3_PRIVATE_EXPORTED)
 
