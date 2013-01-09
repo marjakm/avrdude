@@ -38,8 +38,7 @@ enum {
 };
 #define PIN_MASK    (UINT_MAX>>1)
 #define PIN_INVERSE (~(PIN_MASK))	/* flag for inverted pin in serbb */
-
-#define LED_ON(fd,pin)  ppi_setpin(fd,pin,0)
-#define LED_OFF(fd,pin) ppi_setpin(fd,pin,1)
+#define PIN_MIN     1   /* smallest allowed pin number */
+#define PIN_MAX     255 /* largest allowed pin number */
 
 #endif
