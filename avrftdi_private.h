@@ -3,44 +3,19 @@
 
 #include <stdint.h>
 
-#if defined(HAVE_LIBFTDI1) && defined(HAVE_LIBUSB_1_0)
-# if defined(HAVE_LIBUSB_1_0_LIBUSB_H)
-#  include <libusb-1.0/libusb.h>
-# else
-#  include <libusb.h>
-# endif
-# include <libftdi1/ftdi.h>
-# undef HAVE_LIBFTDI_TYPE_232H
-# define HAVE_LIBFTDI_TYPE_232H 1
-#elif defined(HAVE_LIBFTDI) && defined(HAVE_USB_H)
-/* ftdi.h includes usb.h */
-#include <ftdi.h>
-#else 
-#warning No libftdi or libusb support. Install libftdi1/libusb-1.0 or libftdi/libusb and run configure/make again.
-#define DO_NOT_BUILD_AVRFTDI
+#ifdef HAVE_LIBFTDI1
+#  include <libftdi1/ftdi.h>
+#else
+#  error "libftdi1 required for avrftdi."
 #endif
 
-#ifndef DO_NOT_BUILD_AVRFTDI
-
-enum { ERR, WARN, INFO, DEBUG, TRACE };
-
-#define __log(lvl, fmt, ...)                                  \
-  do {                                                        \
-    avrftdi_log(lvl, __func__, __LINE__, fmt, ##__VA_ARGS__); \
-	} while(0)
-
-
-#define log_err(fmt, ...)   __log(ERR, fmt, ##__VA_ARGS__)
-#define log_warn(fmt, ...)  __log(WARN,  fmt, ##__VA_ARGS__)
-#define log_info(fmt, ...)  __log(INFO,  fmt, ##__VA_ARGS__)
-#define log_debug(fmt, ...) __log(DEBUG, fmt, ##__VA_ARGS__)
-#define log_trace(fmt, ...) __log(TRACE, fmt, ##__VA_ARGS__)
+#include "pgm.h"
 
 #define E(x, ftdi)                                                  \
 	do {                                                              \
 		if ((x))                                                        \
 		{                                                               \
-			avrdude_message(MSG_INFO, "%s:%d %s() %s: %s (%d)\n\t%s\n",             \
+			fprintf(stderr, "%s:%d %s() %s: %s (%d)\n\t%s\n",             \
 					__FILE__, __LINE__, __FUNCTION__,                         \
 					#x, strerror(errno), errno, ftdi_get_error_string(ftdi)); \
 			return -1;                                                    \
@@ -51,7 +26,7 @@ enum { ERR, WARN, INFO, DEBUG, TRACE };
 	do {                                                              \
 		if ((x))                                                        \
 		{                                                               \
-			avrdude_message(MSG_INFO, "%s:%d %s() %s: %s (%d)\n\t%s\n",             \
+			fprintf(stderr, "%s:%d %s() %s: %s (%d)\n\t%s\n",             \
 					__FILE__, __LINE__, __FUNCTION__,                         \
 	 			 #x, strerror(errno), errno, ftdi_get_error_string(ftdi));  \
 		}                                                               \
@@ -75,12 +50,14 @@ typedef struct avrftdi_s {
 	int pin_limit;
 	/* internal RX buffer of the device. needed for INOUT transfers */
 	int rx_buffer_size;
-	int tx_buffer_size;
-	/* use bitbanging instead of mpsse spi */
-	bool use_bitbanging;
+	/* number of guard bits for TPI. should be moved to struct PROGRAMMER */
+	int guard_bits;
+	/* function pointer to the set_pin function, so that we do not have to drag
+	 * it into global scope. it's a hack, but i think it's slightly better than
+	 * the alternative.
+	 */
+	int (*set_pin)(PROGRAMMER *, int, int);
 } avrftdi_t;
 
-void avrftdi_log(int level, const char * func, int line, const char * fmt, ...);
-
-#endif /* DO_NOT_BUILD_AVRFDTI */
+void avrftdi_print(int level, const char * fmt, ...);
 

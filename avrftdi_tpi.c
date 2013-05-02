@@ -5,20 +5,21 @@
 #include <errno.h>
 #include <unistd.h>
 
-#include "avrdude.h"
-#include "libavrdude.h"
-
+#include "pgm.h"
+#include "avrpart.h"
+#include "pindefs.h"
+#include "tpi.h"
 #include "usbasp.h"
 
 #include "avrftdi_tpi.h"
 #include "avrftdi_private.h"
 
-#ifndef DO_NOT_BUILD_AVRFTDI
+#ifdef HAVE_LIBUSB_1_0
+#ifdef HAVE_LIBFTDI1
 
-static void avrftdi_tpi_disable(PROGRAMMER *);
-static int avrftdi_tpi_program_enable(PROGRAMMER * pgm, AVRPART * p);
+#include <libusb-1.0/libusb.h>
+#include <libftdi1/ftdi.h>
 
-#ifdef notyet
 static void
 avrftdi_debug_frame(uint16_t frame)
 {
@@ -56,11 +57,10 @@ avrftdi_debug_frame(uint16_t frame)
 	line1[32] = 0;
 	line2[32] = 0;
 
-	log_debug("%s\n", line0);
-	log_debug("%s\n", line1);
-	//log_debug("%s\n", line2);
+	avrftdi_print(0, "%s\n", line0);
+	avrftdi_print(0, "%s\n", line1);
+	//avrftdi_print(0, "%s\n", line2);
 }
-#endif /* notyet */
 
 int
 avrftdi_tpi_initialize(PROGRAMMER * pgm, AVRPART * p)
@@ -70,38 +70,37 @@ avrftdi_tpi_initialize(PROGRAMMER * pgm, AVRPART * p)
 	avrftdi_t* pdata = to_pdata(pgm);
 	unsigned char buf[] = { MPSSE_DO_WRITE | MPSSE_WRITE_NEG | MPSSE_LSB, 0x01, 0x00, 0xff, 0xff };
 
-	log_info("Using TPI interface\n");
+	avrftdi_print(0, "Using TPI interface\n");
 
 	pgm->program_enable = avrftdi_tpi_program_enable;
 	pgm->cmd_tpi = avrftdi_cmd_tpi;
-	pgm->chip_erase = avr_tpi_chip_erase;
-	pgm->disable = avrftdi_tpi_disable;
-
-	pgm->paged_load = NULL;
-	pgm->paged_write = NULL;
-
-	log_info("Setting /Reset pin low\n");
-	pgm->setpin(pgm, PIN_AVR_RESET, OFF);
-	pgm->setpin(pgm, PIN_AVR_SCK, OFF);
-	pgm->setpin(pgm, PIN_AVR_MOSI, ON);
+	pgm->chip_erase = avrftdi_tpi_chip_erase;
+	//pgm->read_byte = avrftdi_tpi_read_byte;
+	//pgm->write_byte = avrftdi_tpi_write_byte;
+	
+	avrftdi_print(0, "Setting /Reset pin low\n");
+	pdata->set_pin(pgm, PIN_AVR_RESET, OFF);
+	pdata->set_pin(pgm, PIN_AVR_SCK, OFF);
+	pdata->set_pin(pgm, PIN_AVR_MOSI, ON);
 	usleep(20 * 1000);
 
-	pgm->setpin(pgm, PIN_AVR_RESET, ON);
+	pdata->set_pin(pgm, PIN_AVR_RESET, ON);
 	/* worst case 128ms */
 	usleep(2 * 128 * 1000);
 
 	/*setting rst back to 0 */
-	pgm->setpin(pgm, PIN_AVR_RESET, OFF);
+	pdata->set_pin(pgm, PIN_AVR_RESET, OFF);
 	/*wait at least 20ms bevor issuing spi commands to avr */
 	usleep(20 * 1000);
 	
-	log_info("Sending 16 init clock cycles ...\n");
+	avrftdi_print(0, "Sending 16 init clock cycles ... ");
 	ret = ftdi_write_data(pdata->ftdic, buf, sizeof(buf));
+	avrftdi_print(0, "Done.\n");
 
 	return ret;
 }
 
-#define TPI_PARITY_MASK 0x2000
+#define TPI_BIT_PAR 0x2000
 
 static uint16_t
 tpi_byte2frame(uint8_t byte)
@@ -112,7 +111,7 @@ tpi_byte2frame(uint8_t byte)
 	frame |= ((byte << 5) & 0x1fe0);
 
 	if(parity)
-		frame |= TPI_PARITY_MASK;
+		frame |= TPI_BIT_PAR;
 	
 	return frame;
 }
@@ -120,25 +119,27 @@ tpi_byte2frame(uint8_t byte)
 static int
 tpi_frame2byte(uint16_t frame, uint8_t * byte)
 {
-	/* drop idle and start bit(s) */
-	*byte = (frame >> 5) & 0xff;
+	/* drop partity + 2 stop bits */
+	*byte = (frame >> 1) & 0xff;
 
 	int parity = __builtin_popcount(*byte) & 1;
-	int parity_rcvd = (frame & TPI_PARITY_MASK) ? 1 : 0;
+	int parity_rcvd = (frame & 0x200) ? 1 : 0;
 
+	avrftdi_print(1, "Recevied frame with payload 0x%02x and parity %d.\n", *byte, parity);
+	
 	return parity != parity_rcvd;
 }
 
-#ifdef notyet
+#define TPI_FRAME_SIZE 2
+
 static int
 avrftdi_tpi_break(PROGRAMMER * pgm)
 {
-	unsigned char buffer[] = { MPSSE_DO_WRITE | MPSSE_WRITE_NEG | MPSSE_LSB, 1, 0, 0, 0 };
+	unsigned char buffer[] = { MPSSE_DO_WRITE | MPSSE_WRITE_NEG | MPSSE_LSB, 1, 0, 0x80, 0x01 };
 	E(ftdi_write_data(to_pdata(pgm)->ftdic, buffer, sizeof(buffer)) != sizeof(buffer), to_pdata(pgm)->ftdic);
 
 	return 0;
 }
-#endif /* notyet */
 
 static int
 avrftdi_tpi_write_byte(PROGRAMMER * pgm, unsigned char byte)
@@ -154,36 +155,50 @@ avrftdi_tpi_write_byte(PROGRAMMER * pgm, unsigned char byte)
 	buffer[3] = frame & 0xff;
 	buffer[4] = frame >> 8;
 	
-	log_trace("Byte %02x, frame: %04x, MPSSE: 0x%02x 0x%02x 0x%02x  0x%02x 0x%02x\n",
-			byte, frame, buffer[0], buffer[1], buffer[2], buffer[3], buffer[4]);
+	avrftdi_print(1, "TPI frame: 0x%02x 0x%02x, data byte 0x%02x\n",
+			buffer[6], buffer[7], byte);
+	avrftdi_print(2, "FTDI raw data: 0x%02x 0x%02x 0x%02x  0x%02x 0x%02x\n",
+			buffer[0], buffer[1], buffer[2], buffer[3], buffer[4] /*, buffer[5], buffer[6], buffer[7]*/);
 
-	//avrftdi_debug_frame(frame);
+	avrftdi_debug_frame(frame);
 	
 	E(ftdi_write_data(ftdic, buffer, sizeof(buffer)) != sizeof(buffer), ftdic);
 
 	return 0;
 }
 
-#define TPI_FRAME_SIZE 12
-#define TPI_IDLE_BITS   2
-
 static int
 avrftdi_tpi_read_byte(PROGRAMMER * pgm, unsigned char * byte)
 {
 	uint16_t frame;
 	
-	/* use 2 guard bits, 2 default idle bits + 12 frame bits = 16 bits total */
-	const int bytes = 3;
-	int err, i = 0;
-	
-	unsigned char buffer[4];
+	int guard_bits = to_pdata(pgm)->guard_bits;
+	int bytes = ((guard_bits + 7) / 8) + 2;
+	int i = 0, n = 0;
 
-	buffer[0] = MPSSE_DO_READ | MPSSE_LSB;
+	/* worst case size:
+	 * - 128 guard bits
+	 * - 2 default idle bits
+	 * - 12 frame bits
+	 * = 142 bits
+	 */
+	unsigned char buffer[bytes];
+
+	if(bytes > sizeof(buffer))
+		avrftdi_print(0, "Requested more bytes (%d) than available buffer space (%d)\n", bytes, sizeof(buffer));
+
+	avrftdi_print(1, "Guard bit size (incl. default idle bits) is %d\n", guard_bits);
+	avrftdi_print(1, "Reading %d bytes for guard bits + frame\n", bytes);
+
+	/* set it high, so the PDI won't detect we're driving the line */
+	to_pdata(pgm)->set_pin(pgm, PIN_AVR_MOSI, ON);
+
+	buffer[0] = MPSSE_DO_READ | MPSSE_WRITE_NEG | MPSSE_LSB;
 	buffer[1] = (bytes-1) & 0xff;
 	buffer[2] = ((bytes-1) >> 8) & 0xff;
 	buffer[3] = SEND_IMMEDIATE;
 
-	log_trace("MPSSE: 0x%02x 0x%02x 0x%02x 0x%02x (Read frame)\n",
+	avrftdi_print(3, "Read request: 0x%02x 0x%02x 0x%02x 0x%02x\n",
 			buffer[0], buffer[1], buffer[2], buffer[3]);
 
 	ftdi_write_data(to_pdata(pgm)->ftdic, buffer, 4);
@@ -192,35 +207,100 @@ avrftdi_tpi_read_byte(PROGRAMMER * pgm, unsigned char * byte)
 
 	i = 0;
 	do {
-		int err = ftdi_read_data(to_pdata(pgm)->ftdic, &buffer[i], bytes - i);
-		E(err < 0, to_pdata(pgm)->ftdic);
-		i += err;
+		n = ftdi_read_data(to_pdata(pgm)->ftdic, &buffer[i], bytes - i);
+		E(n < 0, to_pdata(pgm)->ftdic);
+		i += n;
 	} while(i < bytes);
 
+	/* dismiss at least (guard_bits / 8) bytes */
+	i = guard_bits / 8;
+	frame = buffer[i] | (buffer[i+1] << 8);
 
-	log_trace("MPSSE: 0x%02x 0x%02x 0x%02x 0x%02x (Read frame)\n",
-			buffer[0], buffer[1], buffer[2], buffer[3]);
+	/* now shift the rest of guard bits out */
+	i = guard_bits - (i*8);
+	frame >>= i;
 
+	avrftdi_print(1, "Received frame 0x%04x (LSB first)\n", frame);
 
-	frame = buffer[0] | (buffer[1] << 8);
-	
-	err = tpi_frame2byte(frame, byte);
-	log_trace("Frame: 0x%04x, byte: 0x%02x\n", frame, *byte);
-	
-	//avrftdi_debug_frame(frame);
-
-	return err;
-}
-
-static int
-avrftdi_tpi_program_enable(PROGRAMMER * pgm, AVRPART * p)
-{
-	return avr_tpi_program_enable(pgm, p, TPIPCR_GT_2b);
+	return tpi_frame2byte(frame, byte);
 }
 
 int
-avrftdi_cmd_tpi(PROGRAMMER * pgm, const unsigned char *cmd, int cmd_len,
-		unsigned char *res, int res_len)
+avrftdi_tpi_program_enable(PROGRAMMER * pgm, AVRPART * p)
+{
+	int retry;
+	int err;
+	int i;
+	unsigned char byte = 0;
+
+	avrftdi_print(0, "TPI program enable\n");
+
+	//TODO determine guard time:
+	//-disable output possible -> guard time
+	//-else: minimum guard time
+	/* set guard time */
+	//avrftdi_tpi_write_byte(pgm, TPI_OP_SSTCS(TPIPCR));
+	//avrftdi_tpi_write_byte(pgm, TPIPCR_GT_2b);
+
+	/* send SKEY */
+  avrftdi_tpi_write_byte(pgm, TPI_CMD_SKEY);
+	for(i = sizeof(tpi_skey) - 1; i >= 0; --i)
+  	avrftdi_tpi_write_byte(pgm, tpi_skey[i]);
+
+	/* check if device is ready */
+  for(retry = 0; retry < 10; retry++)
+  {
+		avrftdi_print(0, "Reading Identification register\n");
+    avrftdi_tpi_write_byte(pgm, TPI_OP_SLDCS(TPIIR));
+    err = avrftdi_tpi_read_byte(pgm, &byte);
+		if(err || byte != 0x80)
+		{
+			avrftdi_print(0, "Error. Sending break.\n");
+			avrftdi_tpi_break(pgm);
+			avrftdi_tpi_break(pgm);
+			continue;
+		}
+
+    avrftdi_print(0, "Reading Status register\n");
+		avrftdi_tpi_write_byte(pgm, TPI_OP_SLDCS(TPISR));
+    err = avrftdi_tpi_read_byte(pgm, &byte);
+		if(err || !(byte & TPISR_NVMEN))
+		{
+			avrftdi_print(0, "Error. Sending break.\n");
+			avrftdi_tpi_break(pgm);
+			avrftdi_tpi_break(pgm);
+			continue;
+		}
+		
+		return 0;
+  }
+
+	avrftdi_print(0, "error connecting to target\n");
+	return -1;
+}
+
+static int
+avrftdi_tpi_nvm_waitbusy(PROGRAMMER * pgm)
+{
+	unsigned char byte;
+	int err;
+	int retry;
+
+	for(retry = 50; retry > 0; retry--)
+	{
+		avrftdi_tpi_write_byte(pgm, TPI_OP_SIN(NVMCSR));
+    err = avrftdi_tpi_read_byte(pgm, &byte);		
+		if(err || (byte & NVMCSR_BSY))
+			continue;
+		return 0;
+	}
+
+	return -1;
+}
+
+int
+avrftdi_cmd_tpi(PROGRAMMER * pgm, unsigned char cmd[], int cmd_len,
+		unsigned char res[], int res_len)
 {
 	int i, err = 0;
 
@@ -241,14 +321,32 @@ avrftdi_cmd_tpi(PROGRAMMER * pgm, const unsigned char *cmd, int cmd_len,
 	return 0;
 }
 
-static void
-avrftdi_tpi_disable(PROGRAMMER * pgm)
+int
+avrftdi_tpi_chip_erase(PROGRAMMER * pgm, AVRPART * p)
 {
-	unsigned char cmd[] = {TPI_OP_SSTCS(TPIPCR), 0};
-	pgm->cmd_tpi(pgm, cmd, sizeof(cmd), NULL, 0);
+  /* Set PR to flash */
+  avrftdi_tpi_write_byte(pgm, TPI_OP_SSTPR(0));
+  avrftdi_tpi_write_byte(pgm, 0x01);
+  avrftdi_tpi_write_byte(pgm, TPI_OP_SSTPR(1));
+  avrftdi_tpi_write_byte(pgm, 0x40);
+  /* select ERASE */
+  avrftdi_tpi_write_byte(pgm, TPI_OP_SOUT(NVMCMD));
+  avrftdi_tpi_write_byte(pgm, NVMCMD_CHIP_ERASE);
+  /* dummy write */
+  avrftdi_tpi_write_byte(pgm, TPI_OP_SST_INC);
+  avrftdi_tpi_write_byte(pgm, 0x00);
+  avrftdi_tpi_nvm_waitbusy(pgm);
+  
+  usleep(p->chip_erase_delay);
+  pgm->initialize(pgm, p);
 
-	log_info("Leaving Programming mode.\n");
+  return 0;
 }
 
-#endif /* DO_NOT_BUILD_AVRFTDI */
+#else /*HAVE_LIBFTDI*/
+#endif  /* HAVE_LIBFTDI */
+
+#else /*HAVE_LIBUSB*/
+
+#endif /*HAVE_LIBUSB*/
 
