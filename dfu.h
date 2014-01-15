@@ -13,7 +13,8 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /* $Id$ */
@@ -24,13 +25,7 @@
 #include "ac_cfg.h"
 
 #ifdef HAVE_LIBUSB
-#if defined(HAVE_USB_H)
-#  include <usb.h>
-#elif defined(HAVE_LUSB0_USB_H)
-#  include <lusb0_usb.h>
-#else
-#  error "libusb needs either <usb.h> or <lusb0_usb.h>"
-#endif
+#include <usb.h>
 #endif
 
 #include <limits.h>
@@ -55,7 +50,6 @@ struct dfu_dev
   struct usb_interface_descriptor intf_desc;
   struct usb_endpoint_descriptor endp_desc;
   char *manf_str, *prod_str, *serno_str;
-  unsigned int timeout;
 };
 
 #else
@@ -123,7 +117,6 @@ extern int dfu_getstatus(struct dfu_dev *dfu, struct dfu_status *status);
 extern int dfu_clrstatus(struct dfu_dev *dfu);
 extern int dfu_dnload(struct dfu_dev *dfu, void *ptr, int size);
 extern int dfu_upload(struct dfu_dev *dfu, void *ptr, int size);
-extern int dfu_abort(struct dfu_dev *dfu);
 
 extern void dfu_show_info(struct dfu_dev *dfu);
 

@@ -13,24 +13,22 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /* $Id$ */
 
 #include "ac_cfg.h"
+#include "dfu.h"
+
+#include "avrdude.h"
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <string.h>
 #include <limits.h>
 #include <unistd.h>
-
-#include "avrdude.h"
-#include "libavrdude.h"
-
-#include "dfu.h"
 
 #include "usbdevs.h" /* for USB_VENDOR_ATMEL */
 
@@ -38,13 +36,13 @@
 
 #ifndef HAVE_LIBUSB
 
-struct dfu_dev *dfu_open(char *port_name) {
-  avrdude_message(MSG_INFO, "%s: Error: No USB support in this compile of avrdude\n",
+int dfu_open(struct dfu_dev *dfu, char *port_name) {
+  fprintf(stderr, "%s: Error: No USB support in this compile of avrdude\n",
     progname);
-  return NULL;
+  return -1;
 }
 
-int dfu_init(struct dfu_dev *dfu, unsigned short usb_vid, unsigned short usb_pid) {
+int dfu_init(struct dfu_dev *dfu, unsigned short usb_pid) {
   return -1;
 }
 
@@ -73,6 +71,8 @@ int dfu_upload(struct dfu_dev *dfu, void * ptr, int size) {
 
 /* If we DO have LibUSB, we can define the real functions. */
 
+#include <usb.h>
+
 /* DFU data structures and constants.
  */
 
@@ -82,14 +82,12 @@ int dfu_upload(struct dfu_dev *dfu, void * ptr, int size) {
 #define DFU_UPLOAD 2
 #define DFU_GETSTATUS 3
 #define DFU_CLRSTATUS 4
-#define DFU_GETSTATE 5          /* FLIPv1 only; not used */
-#define DFU_ABORT 6             /* FLIPv1 only */
 
 /* Block counter global variable. Incremented each time a DFU_DNLOAD command
  * is sent to the device.
  */
 
-static uint16_t wIndex = 0;
+static u_int16_t wIndex = 0;
 
 /* INTERNAL FUNCTION PROTOTYPES
  */
@@ -112,7 +110,7 @@ struct dfu_dev * dfu_open(char *port_spec)
    */
 
   if (strncmp(port_spec, "usb", 3) != 0) {
-    avrdude_message(MSG_INFO, "%s: Error: "
+    fprintf(stderr, "%s: Error: " \
       "Invalid port specification \"%s\" for USB device\n",
       progname, port_spec);
     return NULL;
@@ -121,8 +119,8 @@ struct dfu_dev * dfu_open(char *port_spec)
   if(':' == port_spec[3]) {
       bus_name = strdup(port_spec + 3 + 1);
       if (bus_name == NULL) {
-        avrdude_message(MSG_INFO, "%s: Out of memory in strdup\n", progname);
-        return NULL;
+        perror(progname);
+        exit(1);
       }
 
       dev_name = strchr(bus_name, ':');
@@ -138,14 +136,12 @@ struct dfu_dev * dfu_open(char *port_spec)
 
   if (dfu == NULL)
   {
-    avrdude_message(MSG_INFO, "%s: out of memory\n", progname);
-    free(bus_name);
-    return NULL;
+    perror(progname);
+    exit(1);
   }
 
   dfu->bus_name = bus_name;
   dfu->dev_name = dev_name;
-  dfu->timeout = DFU_TIMEOUT;
 
   /* LibUSB initialization. */
 
@@ -172,7 +168,7 @@ int dfu_init(struct dfu_dev *dfu, unsigned short vid, unsigned short pid)
    */
 
   if (pid == 0 && dfu->dev_name == NULL) {
-    avrdude_message(MSG_INFO, "%s: Error: No DFU support for part; "
+    fprintf(stderr, "%s: Error: No DFU support for part; " \
       "specify PID in config or USB address (via -P) to override.\n",
       progname);
     return -1;
@@ -209,19 +205,20 @@ int dfu_init(struct dfu_dev *dfu, unsigned short vid, unsigned short pid)
      * why the match failed, and if we came across another DFU-capable part.
      */
 
-    avrdude_message(MSG_INFO, "%s: Error: No matching USB device found\n", progname);
+    fprintf(stderr, "%s: Error: No matching USB device found\n", progname);
     return -1;
   }
 
   if(verbose)
-    avrdude_message(MSG_INFO, "%s: Found VID=0x%04x PID=0x%04x at %s:%s\n",
-                    progname, found->descriptor.idVendor, found->descriptor.idProduct,
-                    found->bus->dirname, found->filename);
+    fprintf(stderr,
+      "%s: Found VID=0x%04x PID=0x%04x at %s:%s\n",
+      progname, found->descriptor.idVendor, found->descriptor.idProduct,
+      found->bus->dirname, found->filename);
 
   dfu->dev_handle = usb_open(found);
 
   if (dfu->dev_handle == NULL) {
-    avrdude_message(MSG_INFO, "%s: Error: USB device at %s:%s: %s\n",
+    fprintf(stderr, "%s: Error: USB device at %s:%s: %s\n",
       progname, found->bus->dirname, found->filename, usb_strerror());
     return -1;
   }
@@ -239,6 +236,48 @@ int dfu_init(struct dfu_dev *dfu, unsigned short vid, unsigned short pid)
   if (found->config->interface->altsetting->endpoint != 0)
       memcpy(&dfu->endp_desc, found->config->interface->altsetting->endpoint,
              sizeof(dfu->endp_desc));
+
+  /* Check if descriptor values are what we expect. */
+
+  if (dfu->dev_desc.idVendor != vid)
+    fprintf( stderr, "%s: Warning: USB idVendor = 0x%04X (expected 0x%04X)\n",
+      progname, dfu->dev_desc.idVendor, vid);
+
+  if (pid != 0 && dfu->dev_desc.idProduct != pid)
+    fprintf( stderr, "%s: Warning: USB idProduct = 0x%04X (expected 0x%04X)\n",
+      progname, dfu->dev_desc.idProduct, pid);
+
+  if (dfu->dev_desc.bNumConfigurations != 1)
+    fprintf( stderr, "%s: Warning: USB bNumConfigurations = %d (expected 1)\n",
+      progname, (int) dfu->dev_desc.bNumConfigurations);
+
+  if (dfu->conf_desc.bNumInterfaces != 1)
+    fprintf( stderr, "%s: Warning: USB bNumInterfaces = %d (expected 1)\n",
+      progname, (int) dfu->conf_desc.bNumInterfaces);
+
+  if (dfu->dev_desc.bDeviceClass != 0)
+    fprintf( stderr, "%s: Warning: USB bDeviceClass = %d (expected 0)\n",
+      progname, (int) dfu->dev_desc.bDeviceClass);
+
+  if (dfu->dev_desc.bDeviceSubClass != 0)
+    fprintf( stderr, "%s: Warning: USB bDeviceSubClass = %d (expected 0)\n",
+      progname, (int) dfu->dev_desc.bDeviceSubClass);
+
+  if (dfu->dev_desc.bDeviceProtocol != 0)
+    fprintf( stderr, "%s: Warning: USB bDeviceProtocol = %d (expected 0)\n",
+      progname, (int) dfu->dev_desc.bDeviceProtocol);
+
+  if (dfu->intf_desc.bInterfaceClass != 0xFF)
+    fprintf( stderr, "%s: Warning: USB bInterfaceClass = %d (expected 255)\n",
+      progname, (int) dfu->intf_desc.bInterfaceClass);
+
+  if (dfu->intf_desc.bInterfaceSubClass != 0)
+    fprintf( stderr, "%s: Warning: USB bInterfaceSubClass = %d (expected 0)\n",
+      progname, (int) dfu->intf_desc.bInterfaceSubClass);
+
+  if (dfu->intf_desc.bInterfaceProtocol != 0)
+    fprintf( stderr, "%s: Warning: USB bInterfaceSubClass = %d (expected 0)\n",
+      progname, (int) dfu->intf_desc.bInterfaceProtocol);
 
   /* Get strings. */
 
@@ -272,37 +311,27 @@ int dfu_getstatus(struct dfu_dev *dfu, struct dfu_status *status)
 {
   int result;
 
-  avrdude_message(MSG_TRACE, "%s: dfu_getstatus(): issuing control IN message\n",
-            progname);
-
   result = usb_control_msg(dfu->dev_handle,
     0x80 | USB_TYPE_CLASS | USB_RECIP_INTERFACE, DFU_GETSTATUS, 0, 0,
-    (char*) status, sizeof(struct dfu_status), dfu->timeout);
+    (char*) status, sizeof(struct dfu_status), DFU_TIMEOUT);
 
   if (result < 0) {
-    avrdude_message(MSG_INFO, "%s: Error: Failed to get DFU status: %s\n",
+    fprintf(stderr, "%s: Error: Failed to get DFU status: %s\n",
       progname, usb_strerror());
     return -1;
   }
 
   if (result < sizeof(struct dfu_status)) {
-    avrdude_message(MSG_INFO, "%s: Error: Failed to get DFU status: %s\n",
+    fprintf(stderr, "%s: Error: Failed to get DFU status: %s\n",
       progname, "short read");
     return -1;
   }
 
   if (result > sizeof(struct dfu_status)) {
-    avrdude_message(MSG_INFO, "%s: Error: Oversize read (should not happen); "
+    fprintf(stderr, "%s: Error: Oversize read (should not happen); " \
       "exiting\n", progname);
     exit(1);
   }
-
-  avrdude_message(MSG_TRACE, "%s: dfu_getstatus(): bStatus 0x%02x, bwPollTimeout %d, bState 0x%02x, iString %d\n",
-                  progname,
-                  status->bStatus,
-                  status->bwPollTimeout[0] | (status->bwPollTimeout[1] << 8) | (status->bwPollTimeout[2] << 16),
-                  status->bState,
-                  status->iString);
 
   return 0;
 }
@@ -311,68 +340,41 @@ int dfu_clrstatus(struct dfu_dev *dfu)
 {
   int result;
 
-  avrdude_message(MSG_TRACE, "%s: dfu_clrstatus(): issuing control OUT message\n",
-                  progname);
-
   result = usb_control_msg(dfu->dev_handle,
     USB_TYPE_CLASS | USB_RECIP_INTERFACE, DFU_CLRSTATUS, 0, 0,
-    NULL, 0, dfu->timeout);
+    NULL, 0, DFU_TIMEOUT);
 
   if (result < 0) {
-    avrdude_message(MSG_INFO, "%s: Error: Failed to clear DFU status: %s\n",
+    fprintf(stderr, "%s: Error: Failed to clear DFU status: %s\n",
       progname, usb_strerror());
     return -1;
   }
 
   return 0;
 }
-
-int dfu_abort(struct dfu_dev *dfu)
-{
-  int result;
-
-  avrdude_message(MSG_TRACE, "%s: dfu_abort(): issuing control OUT message\n",
-                  progname);
-
-  result = usb_control_msg(dfu->dev_handle,
-    USB_TYPE_CLASS | USB_RECIP_INTERFACE, DFU_ABORT, 0, 0,
-    NULL, 0, dfu->timeout);
-
-  if (result < 0) {
-    avrdude_message(MSG_INFO, "%s: Error: Failed to reset DFU state: %s\n",
-      progname, usb_strerror());
-    return -1;
-  }
-
-  return 0;
-}
-
 
 int dfu_dnload(struct dfu_dev *dfu, void *ptr, int size)
 {
   int result;
 
-  avrdude_message(MSG_TRACE, "%s: dfu_dnload(): issuing control OUT message, wIndex = %d, ptr = %p, size = %d\n",
-                  progname, wIndex, ptr, size);
-
   result = usb_control_msg(dfu->dev_handle,
     USB_TYPE_CLASS | USB_RECIP_INTERFACE, DFU_DNLOAD, wIndex++, 0,
-    ptr, size, dfu->timeout);
+    ptr, size, DFU_TIMEOUT);
 
   if (result < 0) {
-    avrdude_message(MSG_INFO, "%s: Error: DFU_DNLOAD failed: %s\n",
+    fprintf(stderr, "%s: Error: DFU_DNLOAD failed: %s\n",
       progname, usb_strerror());
     return -1;
   }
 
   if (result < size) {
-    avrdude_message(MSG_INFO, "%s: Error: DFU_DNLOAD failed: %s\n",
+    fprintf(stderr, "%s: Error: DFU_DNLOAD failed: %s\n",
       progname, "short write");
     return -1;
   }
 
   if (result > size) {
-    avrdude_message(MSG_INFO, "%s: Error: Oversize write (should not happen); " \
+    fprintf(stderr, "%s: Error: Oversize write (should not happen); " \
       "exiting\n", progname);
     exit(1);
   }
@@ -384,27 +386,24 @@ int dfu_upload(struct dfu_dev *dfu, void *ptr, int size)
 {
   int result;
 
-  avrdude_message(MSG_TRACE, "%s: dfu_upload(): issuing control IN message, wIndex = %d, ptr = %p, size = %d\n",
-                  progname, wIndex, ptr, size);
-
   result = usb_control_msg(dfu->dev_handle,
     0x80 | USB_TYPE_CLASS | USB_RECIP_INTERFACE, DFU_UPLOAD, wIndex++, 0,
-    ptr, size, dfu->timeout);
+    ptr, size, DFU_TIMEOUT);
 
   if (result < 0) {
-    avrdude_message(MSG_INFO, "%s: Error: DFU_UPLOAD failed: %s\n",
+    fprintf(stderr, "%s: Error: DFU_UPLOAD failed: %s\n",
       progname, usb_strerror());
     return -1;
   }
 
   if (result < size) {
-    avrdude_message(MSG_INFO, "%s: Error: DFU_UPLOAD failed: %s\n",
+    fprintf(stderr, "%s: Error: DFU_UPLOAD failed: %s\n",
       progname, "short read");
     return -1;
   }
 
   if (result > size) {
-    avrdude_message(MSG_INFO, "%s: Error: Oversize read (should not happen); "
+    fprintf(stderr, "%s: Error: Oversize read (should not happen); " \
       "exiting\n", progname);
     exit(1);
   }
@@ -415,26 +414,26 @@ int dfu_upload(struct dfu_dev *dfu, void *ptr, int size)
 void dfu_show_info(struct dfu_dev *dfu)
 {
   if (dfu->manf_str != NULL)
-    avrdude_message(MSG_INFO, "    USB Vendor          : %s (0x%04hX)\n",
+    fprintf(stderr, "    USB Vendor          : %s (0x%04hX)\n",
       dfu->manf_str, (unsigned short) dfu->dev_desc.idVendor);
   else
-    avrdude_message(MSG_INFO, "    USB Vendor          : 0x%04hX\n",
+    fprintf(stderr, "    USB Vendor          : 0x%04hX\n",
       (unsigned short) dfu->dev_desc.idVendor);
 
   if (dfu->prod_str != NULL)
-    avrdude_message(MSG_INFO, "    USB Product         : %s (0x%04hX)\n",
+    fprintf(stderr, "    USB Product         : %s (0x%04hX)\n",
       dfu->prod_str, (unsigned short) dfu->dev_desc.idProduct);
   else
-    avrdude_message(MSG_INFO, "    USB Product         : 0x%04hX\n",
+    fprintf(stderr, "    USB Product         : 0x%04hX\n",
       (unsigned short) dfu->dev_desc.idProduct);
 
-  avrdude_message(MSG_INFO, "    USB Release         : %hu.%hu.%hu\n",
+  fprintf(stderr, "    USB Release         : %hu.%hu.%hu\n",
     ((unsigned short) dfu->dev_desc.bcdDevice >> 8) & 0xFF,
     ((unsigned short) dfu->dev_desc.bcdDevice >> 4) & 0xF,
     ((unsigned short) dfu->dev_desc.bcdDevice >> 0) & 0xF);
 
   if (dfu->serno_str != NULL)
-    avrdude_message(MSG_INFO, "    USB Serial No       : %s\n", dfu->serno_str);
+    fprintf(stderr, "    USB Serial No       : %s\n", dfu->serno_str);
 }
 
 /* INTERNAL FUNCTION DEFINITIONS
@@ -451,7 +450,7 @@ char * get_usb_string(usb_dev_handle * dev_handle, int index) {
   result = usb_get_string_simple(dev_handle, index, buffer, sizeof(buffer)-1);
 
   if (result < 0) {
-    avrdude_message(MSG_INFO, "%s: Warning: Failed to read USB device string %d: %s\n",
+    fprintf( stderr, "%s: Warning: Failed to read USB device string %d: %s\n",
       progname, index, usb_strerror());
     return NULL;
   }
@@ -459,8 +458,8 @@ char * get_usb_string(usb_dev_handle * dev_handle, int index) {
   str = malloc(result+1);
 
   if (str == NULL) {
-    avrdude_message(MSG_INFO, "%s: Out of memory allocating a string\n", progname);
-    return 0;
+    perror(progname);
+    exit(1);
   }
 
   memcpy(str, buffer, result);
