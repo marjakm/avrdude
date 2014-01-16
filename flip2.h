@@ -18,8 +18,10 @@
 
 /* $Id$ */
 
-#ifndef flip2_h
-#define flip2_h
+#ifndef flip_h
+#define flip_h
+
+#include "pgm.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,4 +34,4 @@ extern void flip2_initpgm(PROGRAMMER * pgm);
 }
 #endif
 
-#endif /* flip2_h */
+#endif /* flip_h */
