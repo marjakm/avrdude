@@ -328,8 +328,6 @@ AVRPART * avr_dup_part(AVRPART * d);
 void      avr_free_part(AVRPART * d);
 AVRPART * locate_part(LISTID parts, char * partdesc);
 AVRPART * locate_part_by_avr910_devcode(LISTID parts, int devcode);
-AVRPART * locate_part_by_signature(LISTID parts, unsigned char * sig,
-                                   int sigsize);
 void avr_display(FILE * f, AVRPART * p, const char * prefix, int verbose);
 
 typedef void (*walk_avrparts_cb)(const char *name, const char *desc,
@@ -547,7 +545,7 @@ struct serial_device
   int (*setspeed)(union filedescriptor *fd, long baud);
   void (*close)(union filedescriptor *fd);
 
-  int (*send)(union filedescriptor *fd, const unsigned char * buf, size_t buflen);
+  int (*send)(union filedescriptor *fd, unsigned char * buf, size_t buflen);
   int (*recv)(union filedescriptor *fd, unsigned char * buf, size_t buflen);
   int (*drain)(union filedescriptor *fd, int display);
 
@@ -814,10 +812,10 @@ extern "C" {
 
 /* Writes the specified fuse in fusename (can be "lfuse", "hfuse", or "efuse") and verifies it. Will try up to tries
 amount of times before giving up */
-int safemode_writefuse (unsigned char fuse, char * fusename, PROGRAMMER * pgm, AVRPART * p, int tries);
+int safemode_writefuse (unsigned char fuse, char * fusename, PROGRAMMER * pgm, AVRPART * p, int tries, int verbose);
 
 /* Reads the fuses three times, checking that all readings are the same. This will ensure that the before values aren't in error! */
-int safemode_readfuses (unsigned char * lfuse, unsigned char * hfuse, unsigned char * efuse, unsigned char * fuse, PROGRAMMER * pgm, AVRPART * p);
+int safemode_readfuses (unsigned char * lfuse, unsigned char * hfuse, unsigned char * efuse, unsigned char * fuse, PROGRAMMER * pgm, AVRPART * p, int verbose);
   
 /* This routine will store the current values pointed to by lfuse, hfuse, and efuse into an internal buffer in this routine
 when save is set to 1. When save is 0 (or not 1 really) it will copy the values from the internal buffer into the locations
@@ -895,6 +893,34 @@ void walk_programmer_types(/*LISTID programmer_types,*/ walk_programmer_types_cb
 
 /* formerly config.h */
 
+#define MAX_STR_CONST 1024
+
+enum { V_NONE, V_NUM, V_NUM_REAL, V_STR };
+typedef struct value_t {
+  int      type;
+  /*union { TODO: use an anonymous union here ? */
+    int      number;
+    double   number_real;
+    char   * string;
+  /*};*/
+} VALUE;
+
+
+typedef struct token_t {
+  int primary;
+  VALUE value;
+} TOKEN;
+typedef struct token_t *token_p;
+
+
+extern FILE       * yyin;
+extern PROGRAMMER * current_prog;
+extern AVRPART    * current_part;
+extern AVRMEM     * current_mem;
+extern int          lineno;
+extern const char * infile;
+extern LISTID       string_list;
+extern LISTID       number_list;
 extern LISTID       part_list;
 extern LISTID       programmers;
 extern char         default_programmer[];
@@ -907,13 +933,47 @@ extern int          default_safemode;
  * default_parallel and default_serial. */
 #define DEFAULT_USB "usb"
 
+
+#if !defined(HAS_YYSTYPE)
+#define YYSTYPE token_p
+#endif
+extern YYSTYPE yylval;
+
+extern char string_buf[MAX_STR_CONST];
+extern char *string_buf_ptr;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+int yyparse(void);
+
+
 int init_config(void);
 
 void cleanup_config(void);
+
+TOKEN * new_token(int primary);
+
+void free_token(TOKEN * tkn);
+
+void free_tokens(int n, ...);
+
+TOKEN * number(char * text);
+
+TOKEN * number_real(char * text);
+
+TOKEN * hexnumber(char * text);
+
+TOKEN * string(char * text);
+
+TOKEN * keyword(int primary);
+
+void print_token(TOKEN * tkn);
+
+void pyytext(void);
+
+char * dup_string(const char * str);
 
 int read_config(const char * file);
 
