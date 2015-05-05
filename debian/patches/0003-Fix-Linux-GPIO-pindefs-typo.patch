@@ -1,0 +1,23 @@
+From: Rene Liebscher <R.Liebscher@gmx.de>
+Date: Fri, 1 May 2015 05:18:44 +0200
+Subject: Fix Linux GPIO pindefs typo
+
+Bug: https://savannah.nongnu.org/bugs/index.php?42158
+Bug-Debian: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=745034
+---
+ pindefs.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/pindefs.h b/pindefs.h
+index c040c0e..8c90534 100644
+--- a/pindefs.h
++++ b/pindefs.h
+@@ -59,7 +59,7 @@ enum {
+ #define PIN_MIN     0   /* smallest allowed pin number */
+ #define PIN_MAX     31  /* largest allowed pin number */
+ 
+-#ifdef HAVE_LINUX_GPIO
++#ifdef HAVE_LINUXGPIO
+ /* Embedded systems might have a lot more gpio than only 0-31 */
+ #undef PIN_MAX
+ #define PIN_MAX     255 /* largest allowed pin number */
