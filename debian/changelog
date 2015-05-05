@@ -1,3 +1,9 @@
+avrdude (20150505-mattis1) unstable; urgency=medium
+
+  * Experimental: reset ftdi device on close.
+
+ -- Mattis Marjak <mattis.marjak@defendec.com>  Tue, 05 May 2015 21:19:01 +0300
+
 avrdude (6.1-3) unstable; urgency=medium
 
   * Bump Standards-Version to 3.9.6. No further changes.
@@ -188,7 +194,7 @@ avrdude (5.5-4) unstable; urgency=low
     - Include patchsys-quilt.mk instead of simple-patchsys.mk.
   * debian/patches/series
     - Add all existing patches.
-  * Refresh all patches. 
+  * Refresh all patches.
 
  -- Michael Biebl <biebl@debian.org>  Sat, 19 Jul 2008 03:22:50 +0200
 
@@ -221,7 +227,7 @@ avrdude (5.5-1) unstable; urgency=low
 avrdude (5.4-2) unstable; urgency=low
 
   * debian/control
-    - Use the new "Homepage:" field to specify the upstream URL. 
+    - Use the new "Homepage:" field to specify the upstream URL.
 
  -- Michael Biebl <biebl@debian.org>  Sun, 21 Oct 2007 18:43:24 +0200
 
@@ -237,13 +243,13 @@ avrdude (5.4-1) unstable; urgency=low
 avrdude (5.3.1-1) unstable; urgency=low
 
   * New upstream release.
-  * Prepend a sequence number to the patches. 
+  * Prepend a sequence number to the patches.
 
  -- Michael Biebl <biebl@debian.org>  Mon, 25 Dec 2006 17:56:43 +0100
 
 avrdude (5.2-2) unstable; urgency=low
 
-  * Update maintainer email address to biebl@debian.org. 
+  * Update maintainer email address to biebl@debian.org.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 18 Oct 2006 18:46:28 +0200
 
@@ -267,7 +273,7 @@ avrdude (5.1-3) unstable; urgency=low
 avrdude (5.1-2) unstable; urgency=low
 
   * Delete outdated lexer.c, enforces recreation with an up to date version
-    of flex (closes: #350092). 
+    of flex (closes: #350092).
 
  -- Michael Biebl <biebl@teco.edu>  Fri, 27 Jan 2006 21:27:16 +0100
 
@@ -321,7 +327,7 @@ avrdude (4.4.0-2) unstable; urgency=low
 avrdude (4.4.0-1) unstable; urgency=low
 
   * Initial release (closes: #217453).
-  * Thanks to Anibal Monsalve Salazar for sponsoring this package. 
+  * Thanks to Anibal Monsalve Salazar for sponsoring this package.
 
  -- Michael Biebl <biebl@teco.edu>  Mon, 13 Jun 2005 10:58:32 +0200
 
