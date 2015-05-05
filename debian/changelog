@@ -1,0 +1,327 @@
+avrdude (6.1-3) unstable; urgency=medium
+
+  * Bump Standards-Version to 3.9.6. No further changes.
+  * Update Vcs-Browser URL to use cgit and https.
+  * Fix Linux GPIO typo. Patch cherry-picked from upstream. (Closes: #745034)
+
+ -- Michael Biebl <biebl@debian.org>  Fri, 01 May 2015 05:22:06 +0200
+
+avrdude (6.1-2) unstable; urgency=medium
+
+  * Fix reset on FT245R. Patch cherry-picked from upstream. (Closes: #760764)
+
+ -- Michael Biebl <biebl@debian.org>  Thu, 11 Sep 2014 21:56:06 +0200
+
+avrdude (6.1-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Refresh patches.
+  * Bump Standards-Version to 3.9.5. No further changes.
+
+ -- Michael Biebl <biebl@debian.org>  Fri, 14 Mar 2014 15:30:25 +0100
+
+avrdude (6.0.1-1) unstable; urgency=low
+
+  * New upstream release.
+  * Add Build-Depends on libelf-dev to enable support for reading ELF files.
+  * Enable the Linux sysfs GPIO interface programmer type when building on
+    Linux.
+
+ -- Michael Biebl <biebl@debian.org>  Fri, 20 Sep 2013 20:32:13 +0200
+
+avrdude (5.11.1-2) unstable; urgency=low
+
+  * Move package to collab-maint.
+  * Bump Standards-Version to 3.9.4.
+  * Bump debhelper compatibility level to 9.
+
+ -- Michael Biebl <biebl@debian.org>  Sun, 24 Mar 2013 01:49:52 +0100
+
+avrdude (5.11.1-1) unstable; urgency=low
+
+  * New upstream release.
+  * Install ChangeLog files for 2007-2009.
+
+ -- Michael Biebl <biebl@debian.org>  Tue, 18 Oct 2011 23:06:14 +0200
+
+avrdude (5.11-1) unstable; urgency=low
+
+  * New upstream release.
+  * Bump debhelper compatibility level to 8 and update build dependency
+    accordingly.
+  * Bump Standards-Version to 3.9.2. No further changes.
+  * Remove debian/patches/01-arduino-auto-reset.patch, merged upstream.
+  * Refresh debian/patches/02-manpage_fix.patch.
+  * Add support for FT2232 based programmers by building against libftdi.
+
+ -- Michael Biebl <biebl@debian.org>  Sun, 28 Aug 2011 14:30:26 +0200
+
+avrdude (5.10-3) unstable; urgency=low
+
+  * debian/patches/01-arduino-auto-reset.patch
+    - Fix DTR on/off to make Arduino auto-reset work. (Closes: #587280)
+      Patch cherry-picked from upstream.
+
+ -- Michael Biebl <biebl@debian.org>  Sun, 27 Jun 2010 01:57:37 +0200
+
+avrdude (5.10-2) unstable; urgency=low
+
+  * Switch to source format 3.0 (quilt).
+    - Drop Build-Depends on quilt.
+    - Remove patchsys-quilt.mk include from debian/rules.
+    - Remove debian/README.source.
+    - Add debian/source/format.
+  * Bump Standards-Version to 3.8.4. No further changes.
+  * Switch from cdbs to dh v7.
+    - Drop Build-Depends on cdbs.
+    - Bump Build-Depends on debhelper to (>= 7.0.50).
+    - Bump Build-Depends on autotools-dev to (>= 20100122.1) for the
+      autotools_dev dh addon.
+    - Convert debian/rules to dh.
+
+ -- Michael Biebl <biebl@debian.org>  Mon, 21 Jun 2010 05:46:04 +0200
+
+avrdude (5.10-1) unstable; urgency=low
+
+  * New upstream release.
+  * Removed patches:
+    - debian/patches/01-kfreebsd.patch (merged upstream)
+    - debian/patches/03-freebsd-serial-device.patch (merged upstream)
+    - debian/patches/04-am_maintainer_mode.patch (obsolete)
+    - debian/patches/99-autoreconf.patch (obsolete)
+
+ -- Michael Biebl <biebl@debian.org>  Tue, 19 Jan 2010 18:57:14 +0100
+
+avrdude (5.9-1) unstable; urgency=low
+
+  * New upstream release.
+  * debian/patches/01-kfreebsd.patch
+    - Update configure check to correctly detect kfreebsd and set the
+      default serial and parallel port accordingly.
+  * debian/patches/03-freebsd-serial-device.patch
+    - The serial port naming scheme has changed since FreeBSD 6.0 from cuaa?
+      to cuad?. Update the configure check and the documentation to reflect
+      this change.
+  * debian/patches/04-am_maintainer_mode.patch
+    - Set AM_MAINTAINER_MODE as it makes patching the build system less
+      painful.
+  * debian/patches/99-autoreconf.patch
+    - Run autoreconf -i for the changes above.
+
+ -- Michael Biebl <biebl@debian.org>  Sun, 17 Jan 2010 14:19:31 +0100
+
+avrdude (5.8-2) unstable; urgency=low
+
+  * Replace libreadline5-dev build dependency with libreadline-dev.
+  * Bump Standards-Version to 3.8.3. No further changes.
+
+ -- Michael Biebl <biebl@debian.org>  Wed, 23 Sep 2009 15:10:47 +0200
+
+avrdude (5.8-1) unstable; urgency=low
+
+  * New upstream release.
+  * Bump Standards-Version to 3.8.2. No further changes.
+
+ -- Michael Biebl <biebl@debian.org>  Tue, 14 Jul 2009 15:09:17 +0200
+
+avrdude (5.6-1) unstable; urgency=low
+
+  * New upstream release.
+  * debian/patches/03-spi_support.patch
+    - Removed, merged upstream.
+  * debian/patches/04-usbtiny_64bit_fix.patch
+    - Removed, fixed upstream.
+
+ -- Michael Biebl <biebl@debian.org>  Tue, 03 Mar 2009 17:43:22 +0100
+
+avrdude (5.5-8) unstable; urgency=low
+
+  * debian/copyright
+    - Refer to the versioned GPL-2 file in /usr/share/common-licenses as
+      avrdude is released under version 2 of the GPL.
+  * debian/rules
+    - Include debhelper.mk before any other files as recommended by the cdbs
+      documentation.
+  * debian/control
+    - Wrap Build-Depends.
+    - Bump Build-Depends on debhelper to (>= 7).
+  * debian/compat
+    - Bump debhelper compat level to 7.
+
+ -- Michael Biebl <biebl@debian.org>  Wed, 18 Feb 2009 13:43:47 +0100
+
+avrdude (5.5-7) unstable; urgency=low
+
+  * debian/patches/04-usbtiny_64bit_fix.patch
+    - Fix chip programming failures using USBTiny adapters on 64bit systems.
+      The res[4] variable is passed to usbtiny_cmd() as char pointer and
+      sizeof(char*) evaluates to 8 on 64bit systems. So hardcode the number of
+      bytes we want to read instead of using sizeof. (Closes: #511751)
+
+ -- Michael Biebl <biebl@debian.org>  Wed, 14 Jan 2009 07:13:39 +0100
+
+avrdude (5.5-6) unstable; urgency=low
+
+  * debian/patches/03-spi_support.patch
+    - Add new commands to avrdude's terminal mode to support direct SPI
+      transfers. (Closes: #509130)
+      Thanks to Andrew O. Shadoura for the patch.
+
+ -- Michael Biebl <biebl@debian.org>  Thu, 18 Dec 2008 23:41:30 +0100
+
+avrdude (5.5-5) unstable; urgency=low
+
+  * Misc white space cleanups.
+  * debian/control
+    - Add Vcs-* fields.
+
+ -- Michael Biebl <biebl@debian.org>  Sat, 25 Oct 2008 01:42:20 +0200
+
+avrdude (5.5-4) unstable; urgency=low
+
+  * Switch patch system to quilt.
+  * debian/control
+    - Add Build-Depends on quilt.
+    - Bump Standards-Version to 3.8.0. Add debian/README.source as recommended
+      by the new policy.
+  * debian/rules
+    - Include patchsys-quilt.mk instead of simple-patchsys.mk.
+  * debian/patches/series
+    - Add all existing patches.
+  * Refresh all patches. 
+
+ -- Michael Biebl <biebl@debian.org>  Sat, 19 Jul 2008 03:22:50 +0200
+
+avrdude (5.5-3) unstable; urgency=low
+
+  * debian/avrdude-doc.doc-base
+    - Update the Section: field to comply with the new doc-base Manual.
+  * debian/control
+    - Add ${misc:Depends}.
+
+ -- Michael Biebl <biebl@debian.org>  Tue, 04 Mar 2008 23:17:20 +0100
+
+avrdude (5.5-2) unstable; urgency=low
+
+  * debian/control
+    - Bump Standards-Version to 3.7.3. No further changes required.
+  * debian/avrdude-doc.doc-base
+    - Cleanup unnecessary white spaces.
+
+ -- Michael Biebl <biebl@debian.org>  Tue, 08 Jan 2008 07:39:04 +0100
+
+avrdude (5.5-1) unstable; urgency=low
+
+  * New upstream release.
+  * debian/avrdude.docs
+    - Install the ChangeLog-2004-2006 file.
+
+ -- Michael Biebl <biebl@debian.org>  Tue, 30 Oct 2007 21:02:48 +0100
+
+avrdude (5.4-2) unstable; urgency=low
+
+  * debian/control
+    - Use the new "Homepage:" field to specify the upstream URL. 
+
+ -- Michael Biebl <biebl@debian.org>  Sun, 21 Oct 2007 18:43:24 +0200
+
+avrdude (5.4-1) unstable; urgency=low
+
+  * New upstream release.
+  * debian/control
+    - Replace Build-Depends: tetex-bin with texlive-latex-base. teTeX has been
+      obsoleted and superseded by texlive.
+
+ -- Michael Biebl <biebl@debian.org>  Fri, 18 May 2007 17:00:42 +0200
+
+avrdude (5.3.1-1) unstable; urgency=low
+
+  * New upstream release.
+  * Prepend a sequence number to the patches. 
+
+ -- Michael Biebl <biebl@debian.org>  Mon, 25 Dec 2006 17:56:43 +0100
+
+avrdude (5.2-2) unstable; urgency=low
+
+  * Update maintainer email address to biebl@debian.org. 
+
+ -- Michael Biebl <biebl@debian.org>  Wed, 18 Oct 2006 18:46:28 +0200
+
+avrdude (5.2-1) unstable; urgency=low
+
+  * New upstream release.
+  * debian/rules
+    + Remove obsolete clean rule, lexer.c is not shipped anymore in the
+      upstream tarball.
+
+ -- Michael Biebl <biebl@teco.edu>  Tue, 10 Oct 2006 02:30:19 +0200
+
+avrdude (5.1-3) unstable; urgency=low
+
+  * Properly indent homepage URL in package description.
+  * Bumped debhelper compatibility to 5.
+  * Bumped Standards-Version to 3.7.2, no further changes required.
+
+ -- Michael Biebl <biebl@teco.edu>  Wed, 17 May 2006 09:05:12 +0200
+
+avrdude (5.1-2) unstable; urgency=low
+
+  * Delete outdated lexer.c, enforces recreation with an up to date version
+    of flex (closes: #350092). 
+
+ -- Michael Biebl <biebl@teco.edu>  Fri, 27 Jan 2006 21:27:16 +0100
+
+avrdude (5.1-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- Michael Biebl <biebl@teco.edu>  Tue, 24 Jan 2006 23:03:43 +0100
+
+avrdude (5.0-1) unstable; urgency=low
+
+  * New upstream release (closes: #330243).
+    + Removed patch html_doc_build_fix.diff, fixed upstream.
+  * Added patch kfreebsd.diff to make avrdude compile on GNU/kFreeBSD
+    (closes: #329448). Thanks to Aurelien Jarno.
+  * Added patch manpage_fix.diff to reflect Debian specific locations of
+    certain files.
+  * Updated watch file.
+
+ -- Michael Biebl <biebl@teco.edu>  Tue,  4 Oct 2005 17:41:14 +0200
+
+avrdude (4.4.0-5) unstable; urgency=low
+
+  * Build against libreadline5.
+
+ -- Michael Biebl <biebl@teco.edu>  Thu,  8 Sep 2005 01:13:51 +0200
+
+avrdude (4.4.0-4) unstable; urgency=low
+
+  * Switched build system to cdbs.
+  * Added watch file.
+
+ -- Michael Biebl <biebl@teco.edu>  Wed, 10 Aug 2005 04:34:49 +0200
+
+avrdude (4.4.0-3) unstable; urgency=low
+
+  * Reverted changes to Makefile.in files made by automake. Changed
+    doc/Makefile.in by hand.
+  * Added Section: and Priority: to package descriptions in debian/control.
+
+ -- Michael Biebl <biebl@teco.edu>  Wed, 10 Aug 2005 04:18:24 +0200
+
+avrdude (4.4.0-2) unstable; urgency=low
+
+  * The new version of texi2html caused avrdude to FTBFS. This update fixes
+    this (closes: #318729).
+  * Updated to standards version 3.6.2.
+
+ -- Michael Biebl <biebl@teco.edu>  Tue, 19 Jul 2005 00:04:24 +0200
+
+avrdude (4.4.0-1) unstable; urgency=low
+
+  * Initial release (closes: #217453).
+  * Thanks to Anibal Monsalve Salazar for sponsoring this package. 
+
+ -- Michael Biebl <biebl@teco.edu>  Mon, 13 Jun 2005 10:58:32 +0200
+

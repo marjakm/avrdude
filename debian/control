@@ -1,0 +1,46 @@
+Source: avrdude
+Section: electronics
+Priority: extra
+Maintainer: Michael Biebl <biebl@debian.org>
+Build-Depends:
+ debhelper (>= 9),
+ autotools-dev (>= 20100122.1),
+ texi2html,
+ texinfo,
+ texlive-latex-base,
+ flex,
+ bison,
+ libncurses5-dev,
+ libreadline-dev,
+ libusb-dev,
+ libftdi-dev,
+ libelf-dev
+Standards-Version: 3.9.6
+Vcs-Git: git://anonscm.debian.org/collab-maint/avrdude.git
+Vcs-Browser: https://anonscm.debian.org/cgit/collab-maint/avrdude.git
+Homepage: http://savannah.nongnu.org/projects/avrdude/
+
+Package: avrdude
+Section: electronics
+Priority: extra
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Suggests: avrdude-doc
+Description: software for programming Atmel AVR microcontrollers
+ AVRDUDE is an open source utility to download/upload/manipulate the
+ ROM and EEPROM contents of AVR microcontrollers using the in-system
+ programming technique (ISP).
+
+Package: avrdude-doc
+Section: doc
+Priority: extra
+Architecture: all
+Depends: ${misc:Depends}
+Suggests: doc-base
+Description: documentation for avrdude
+ AVRDUDE is an open source utility to download/upload/manipulate the
+ ROM and EEPROM contents of AVR microcontrollers using the in-system
+ programming technique (ISP).
+ .
+ This package contains documentation for configuring and running
+ AVRDUDE.
