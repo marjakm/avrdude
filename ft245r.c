@@ -81,7 +81,7 @@
 #elif defined(HAVE_LIBFTDI) && defined(HAVE_USB_H)
 /* ftdi.h includes usb.h */
 #include <ftdi.h>
-#else 
+#else
 #warning No libftdi or libusb support. Install libftdi1/libusb-1.0 or libftdi/libusb and run configure/make again.
 #define DO_NOT_BUILD_FT245R
 #endif
@@ -587,7 +587,7 @@ static int ft245r_open(PROGRAMMER * pgm, char * port) {
         goto cleanup_no_usb;
     }
 
-    ft245r_ddr = 
+    ft245r_ddr =
          pgm->pin[PIN_AVR_SCK].mask[0]
        | pgm->pin[PIN_AVR_MOSI].mask[0]
        | pgm->pin[PIN_AVR_RESET].mask[0]
@@ -643,21 +643,42 @@ static int ft245r_open(PROGRAMMER * pgm, char * port) {
     return 0;
 
 cleanup:
+    avrdude_message(MSG_INFO, "cleanup");
     ftdi_usb_close(handle);
 cleanup_no_usb:
+    avrdude_message(MSG_INFO, "cleanup_no_usb");
     ftdi_deinit (handle);
     free(handle);
     handle = NULL;
     return -1;
 }
 
+//#include </usr/include/libusb-1.0/libusb.h>
+#include <usb.h>
 
 static void ft245r_close(PROGRAMMER * pgm) {
     if (handle) {
+        int e;
+        avrdude_message(MSG_INFO, "ft245r_close\n");
         // I think the switch to BB mode and back flushes the buffer.
-        ftdi_set_bitmode(handle, 0, BITMODE_SYNCBB); // set Synchronous BitBang, all in puts
-        ftdi_set_bitmode(handle, 0, BITMODE_RESET); // disable Synchronous BitBang
-        ftdi_usb_close(handle);
+        e = ftdi_set_bitmode(handle, 0, BITMODE_SYNCBB); // set Synchronous BitBang, all in puts
+        avrdude_message(MSG_INFO, "BITMODE_SYNCBB %d\n", e);
+        e = ftdi_set_bitmode(handle, 0, BITMODE_RESET); // disable Synchronous BitBang
+        avrdude_message(MSG_INFO, "BITMODE_RESET %d\n", e);
+
+        //e = ftdi_usb_reset(handle);
+        //avrdude_message(MSG_INFO, "ftdi_usb_reset %d\n", e);
+
+        //ftdi_usb_close(handle);
+        e = usb_claim_interface(handle->usb_dev, handle->interface);
+        avrdude_message(MSG_INFO, "claim %d\n", e);
+
+        e = usb_reset(handle->usb_dev);
+
+        //e = usb_attach_kernel_driver(handle->usb_dev, handle->interface);
+        avrdude_message(MSG_INFO, "usb_reset %d\n", e);
+        handle->usb_dev = NULL;
+
         ftdi_deinit (handle);
         pthread_cancel(readerthread);
         pthread_join(readerthread, NULL);
@@ -882,6 +903,7 @@ static int ft245r_paged_load_flash(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
     int addr_save,buf_pos;
     int req_count = 0;
     unsigned char buf[FT245R_FRAGMENT_SIZE+1];
+    //unsigned char buf[FT245R_FRAGMENT_SIZE+1+128];
 
     for (i=0; i<n_bytes; ) {
         buf_pos = 0;
@@ -895,6 +917,21 @@ static int ft245r_paged_load_flash(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
             addr ++;
             i++;
         }
+/*
+        if (m->op[AVR_OP_LOAD_EXT_ADDR]) {
+            int addr_wk = addr_save - (addr_save % m->page_size);
+            unsigned char cmd[4];
+            OPCODE *lext = m->op[AVR_OP_LOAD_EXT_ADDR];
+
+            memset(cmd, 0, 4);
+            avr_set_bits(lext, cmd);
+            avr_set_addr(lext, cmd, addr_wk/2);
+            buf_pos += set_data(pgm, buf+buf_pos, cmd[0]);
+            buf_pos += set_data(pgm, buf+buf_pos, cmd[1]);
+            buf_pos += set_data(pgm, buf+buf_pos, cmd[2]);
+            buf_pos += set_data(pgm, buf+buf_pos, cmd[3]);
+        }
+*/
         if (i >= n_bytes) {
             ft245r_out = SET_BITS_0(ft245r_out,pgm,PIN_AVR_SCK,0); // sck down
             buf[buf_pos++] = ft245r_out;
