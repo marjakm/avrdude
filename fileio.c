@@ -55,14 +55,14 @@ struct ihexrec {
 };
 
 
-static int b2ihex(unsigned char * inbuf, int bufsize, 
+static int b2ihex(unsigned char * inbuf, int bufsize,
              int recsize, int startaddr,
              char * outfile, FILE * outf);
 
 static int ihex2b(char * infile, FILE * inf,
              AVRMEM * mem, int bufsize, unsigned int fileoffset);
 
-static int b2srec(unsigned char * inbuf, int bufsize, 
+static int b2srec(unsigned char * inbuf, int bufsize,
            int recsize, int startaddr,
            char * outfile, FILE * outf);
 
@@ -76,7 +76,7 @@ static int srec_readrec(struct ihexrec * srec, char * rec);
 static int fileio_rbin(struct fioparms * fio,
                   char * filename, FILE * f, AVRMEM * mem, int size);
 
-static int fileio_ihex(struct fioparms * fio, 
+static int fileio_ihex(struct fioparms * fio,
                   char * filename, FILE * f, AVRMEM * mem, int size);
 
 static int fileio_srec(struct fioparms * fio,
@@ -114,7 +114,7 @@ char * fmtstr(FILEFMT format)
 
 
 
-static int b2ihex(unsigned char * inbuf, int bufsize, 
+static int b2ihex(unsigned char * inbuf, int bufsize,
            int recsize, int startaddr,
            char * outfile, FILE * outf)
 {
@@ -153,7 +153,7 @@ static int b2ihex(unsigned char * inbuf, int bufsize,
       }
       cksum = -cksum;
       fprintf(outf, "%02X\n", cksum);
-      
+
       nextaddr += n;
       nbytes   += n;
     }
@@ -235,7 +235,7 @@ static int ihex_readrec(struct ihexrec * ihex, char * rec)
   if (e == buf || *e != 0)
     return -1;
 
-  cksum = ihex->reclen + ((ihex->loadofs >> 8) & 0x0ff) + 
+  cksum = ihex->reclen + ((ihex->loadofs >> 8) & 0x0ff) +
     (ihex->loadofs & 0x0ff) + ihex->rectyp;
 
   /* data */
@@ -299,7 +299,7 @@ static int ihex2b(char * infile, FILE * inf,
   while (fgets((char *)buffer,MAX_LINE_LEN,inf)!=NULL) {
     lineno++;
     len = strlen(buffer);
-    if (buffer[len-1] == '\n') 
+    if (buffer[len-1] == '\n')
       buffer[--len] = 0;
     if (buffer[0] != ':')
       continue;
@@ -384,7 +384,7 @@ static int ihex2b(char * infile, FILE * inf,
   }
 }
 
-static int b2srec(unsigned char * inbuf, int bufsize, 
+static int b2srec(unsigned char * inbuf, int bufsize,
            int recsize, int startaddr,
            char * outfile, FILE * outf)
 {
@@ -401,10 +401,10 @@ static int b2srec(unsigned char * inbuf, int bufsize,
             progname, recsize);
     return -1;
   }
-  
+
   nextaddr = startaddr;
   buf = inbuf;
-  nbytes = 0;    
+  nbytes = 0;
 
   addr_width = 0;
 
@@ -412,7 +412,7 @@ static int b2srec(unsigned char * inbuf, int bufsize,
 
     n = recsize;
 
-    if (n > bufsize) 
+    if (n > bufsize)
       n = bufsize;
 
     if (n) {
@@ -439,7 +439,7 @@ static int b2srec(unsigned char * inbuf, int bufsize,
 
       cksum += n + addr_width + 1;
 
-      for (i=addr_width; i>0; i--) 
+      for (i=addr_width; i>0; i--)
         cksum += (nextaddr >> (i-1) * 8) & 0xff;
 
       for (i=nextaddr; i<nextaddr + n; i++) {
@@ -481,12 +481,12 @@ static int b2srec(unsigned char * inbuf, int bufsize,
   fprintf(outf, tmpl, n + addr_width + 1, nextaddr);
 
   cksum += n + addr_width +1;
-  for (i=addr_width; i>0; i--) 
+  for (i=addr_width; i>0; i--)
     cksum += (nextaddr >> (i - 1) * 8) & 0xff;
   cksum = 0xff - cksum;
   fprintf(outf, "%02X\n", cksum);
 
-  return nbytes; 
+  return nbytes;
 }
 
 
@@ -505,34 +505,34 @@ static int srec_readrec(struct ihexrec * srec, char * rec)
   addr_width = 2;
 
   /* record type */
-  if (offset + 1 > len) 
+  if (offset + 1 > len)
     return -1;
   srec->rectyp = rec[offset++];
-  if (srec->rectyp == 0x32 || srec->rectyp == 0x38) 
+  if (srec->rectyp == 0x32 || srec->rectyp == 0x38)
     addr_width = 3;	/* S2,S8-record */
-  else if (srec->rectyp == 0x33 || srec->rectyp == 0x37) 
+  else if (srec->rectyp == 0x33 || srec->rectyp == 0x37)
     addr_width = 4;	/* S3,S7-record */
 
   /* reclen */
-  if (offset + 2 > len) 
+  if (offset + 2 > len)
     return -1;
-  for (i=0; i<2; i++) 
+  for (i=0; i<2; i++)
     buf[i] = rec[offset++];
   buf[i] = 0;
   srec->reclen = strtoul(buf, &e, 16);
   cksum += srec->reclen;
   srec->reclen -= (addr_width+1);
-  if (e == buf || *e != 0) 
+  if (e == buf || *e != 0)
     return -1;
 
   /* load offset */
-  if (offset + addr_width > len) 
+  if (offset + addr_width > len)
     return -1;
-  for (i=0; i<addr_width*2; i++) 
+  for (i=0; i<addr_width*2; i++)
     buf[i] = rec[offset++];
   buf[i] = 0;
   srec->loadofs = strtoull(buf, &e, 16);
-  if (e == buf || *e != 0) 
+  if (e == buf || *e != 0)
     return -1;
 
   for (i=addr_width; i>0; i--)
@@ -540,25 +540,25 @@ static int srec_readrec(struct ihexrec * srec, char * rec)
 
   /* data */
   for (j=0; j<srec->reclen; j++) {
-    if (offset+2  > len) 
+    if (offset+2  > len)
       return -1;
-    for (i=0; i<2; i++) 
+    for (i=0; i<2; i++)
       buf[i] = rec[offset++];
     buf[i] = 0;
     srec->data[j] = strtoul(buf, &e, 16);
-    if (e == buf || *e != 0) 
+    if (e == buf || *e != 0)
       return -1;
     cksum += srec->data[j];
   }
 
   /* cksum */
-  if (offset + 2 > len) 
+  if (offset + 2 > len)
     return -1;
-  for (i=0; i<2; i++) 
+  for (i=0; i<2; i++)
     buf[i] = rec[offset++];
   buf[i] = 0;
   srec->cksum = strtoul(buf, &e, 16);
-  if (e == buf || *e != 0) 
+  if (e == buf || *e != 0)
     return -1;
 
   rc = 0xff - cksum;
@@ -588,7 +588,7 @@ static int srec2b(char * infile, FILE * inf,
   while (fgets((char *)buffer,MAX_LINE_LEN,inf)!=NULL) {
     lineno++;
     len = strlen(buffer);
-    if (buffer[len-1] == '\n') 
+    if (buffer[len-1] == '\n')
       buffer[--len] = 0;
     if (buffer[0] != 0x53)
       continue;
@@ -607,7 +607,7 @@ static int srec2b(char * infile, FILE * inf,
       return -1;
     }
 
-    datarec=0; 
+    datarec=0;
     switch (srec.rectyp) {
       case 0x30: /* S0 - header record*/
         /* skip */
@@ -677,7 +677,7 @@ static int srec2b(char * infile, FILE * inf,
       }
       if (nextaddr+srec.reclen > maxaddr)
         maxaddr = nextaddr+srec.reclen;
-      reccount++;      
+      reccount++;
     }
 
   }
@@ -1150,7 +1150,7 @@ static int fileio_imm(struct fioparms * fio,
 }
 
 
-static int fileio_ihex(struct fioparms * fio, 
+static int fileio_ihex(struct fioparms * fio,
                   char * filename, FILE * f, AVRMEM * mem, int size)
 {
   int rc;
@@ -1444,7 +1444,7 @@ static int fmt_autodetect(char * fname)
 
 
 
-int fileio(int op, char * filename, FILEFMT format, 
+int fileio(int op, char * filename, FILEFMT format,
              struct avrpart * p, char * memtype, int size)
 {
   int rc;
@@ -1471,8 +1471,8 @@ int fileio(int op, char * filename, FILEFMT format,
   if (fio.op == FIO_READ) {
     /* 0xff fill unspecified memory */
     memset(mem->buf, 0xff, size);
+    memset(mem->tags, 0, size);
   }
-  memset(mem->tags, 0, size);
 
   using_stdio = 0;
 
@@ -1601,4 +1601,3 @@ int fileio(int op, char * filename, FILEFMT format,
 
   return rc;
 }
-
