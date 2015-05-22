@@ -896,42 +896,60 @@ static int ft245r_paged_load_gen(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
     return 0;
 }
 
+static int set_extended_high_byte(PROGRAMMER * pgm, AVRMEM * m, unsigned int addr, OPCODE * lext) {
+    int addr_wk = addr - (addr % m->page_size);
+    unsigned char cmd[4], res[4];
+
+    /*
+     * if this memory is word-addressable, adjust the address
+     * accordingly
+     */
+    if ((m->op[AVR_OP_LOADPAGE_LO]) || (m->op[AVR_OP_READ_LO]))
+    addr_wk = addr_wk / 2;
+    
+    while (do_request(pgm, m))
+        ;
+    memset(cmd, 0, sizeof(cmd));
+    avr_set_bits(lext, cmd);
+    avr_set_addr(lext, cmd, addr_wk);
+    ft245r_cmd(pgm, cmd, res);
+    usleep(m->max_write_delay);
+    return 0;
+}
+
 static int ft245r_paged_load_flash(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
                                    unsigned int page_size, unsigned int addr,
                                    unsigned int n_bytes) {
     unsigned long    i,j,n;
-    int addr_save,buf_pos;
+    int addr_save,buf_pos,do_addr_extended_high_byte_set;
+    int extention_done = 0;
     int req_count = 0;
-    unsigned char buf[FT245R_FRAGMENT_SIZE+1];
-    //unsigned char buf[FT245R_FRAGMENT_SIZE+1+128];
+    unsigned char buf[FT245R_FRAGMENT_SIZE+1+128];
+    OPCODE * lext = m->op[AVR_OP_LOAD_EXT_ADDR];
+
+    if (lext != NULL) {
+        set_extended_high_byte(pgm, m, addr, lext);
+    }
 
     for (i=0; i<n_bytes; ) {
         buf_pos = 0;
         addr_save = addr;
+        do_addr_extended_high_byte_set = 0;
         for (j=0; j< FT245R_FRAGMENT_SIZE/8/FT245R_CYCLES/4; j++) {
             if (i >= n_bytes) break;
             buf_pos += set_data(pgm, buf+buf_pos, (addr & 1)?0x28:0x20 );
             buf_pos += set_data(pgm, buf+buf_pos, (addr >> 9) & 0xff );
             buf_pos += set_data(pgm, buf+buf_pos, (addr >> 1) & 0xff );
             buf_pos += set_data(pgm, buf+buf_pos, 0);
+            if ( !extention_done && (m->paged) && (addr == 0xFFFF)) {
+                do_addr_extended_high_byte_set = 1;
+                extention_done = 1;
+                break;
+            }
             addr ++;
             i++;
         }
-/*
-        if (m->op[AVR_OP_LOAD_EXT_ADDR]) {
-            int addr_wk = addr_save - (addr_save % m->page_size);
-            unsigned char cmd[4];
-            OPCODE *lext = m->op[AVR_OP_LOAD_EXT_ADDR];
 
-            memset(cmd, 0, 4);
-            avr_set_bits(lext, cmd);
-            avr_set_addr(lext, cmd, addr_wk/2);
-            buf_pos += set_data(pgm, buf+buf_pos, cmd[0]);
-            buf_pos += set_data(pgm, buf+buf_pos, cmd[1]);
-            buf_pos += set_data(pgm, buf+buf_pos, cmd[2]);
-            buf_pos += set_data(pgm, buf+buf_pos, cmd[3]);
-        }
-*/
         if (i >= n_bytes) {
             ft245r_out = SET_BITS_0(ft245r_out,pgm,PIN_AVR_SCK,0); // sck down
             buf[buf_pos++] = ft245r_out;
@@ -942,6 +960,11 @@ static int ft245r_paged_load_flash(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
         req_count++;
         if (req_count > REQ_OUTSTANDINGS)
             do_request(pgm, m);
+
+        if ( (lext != NULL) && do_addr_extended_high_byte_set) {
+            set_extended_high_byte(pgm, m, addr, lext);
+            req_count = 0;
+        }
 
     }
     while (do_request(pgm, m))
