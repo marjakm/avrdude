@@ -1,3 +1,9 @@
+avrdude (20150522-mattis1) unstable; urgency=medium
+
+  * Fix FT245R image verification
+
+ -- Mattis Marjak <mattis.marjak@defendec.com>  Fri, 22 May 2015 22:45:19 +0300
+
 avrdude (20150505-mattis1) unstable; urgency=medium
 
   * Experimental: reset ftdi device on close.
