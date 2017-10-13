@@ -3,6 +3,5 @@ fix-ps-creationdate.patch
 Fix-paths-in-the-man-page.patch
 no-cpp-timestamps.patch
 use-tbl-man-preprocessor.patch
-linux-gpio-conversion.patch
 no-lock-byte-read-mask.patch
 support-t441-t841.patch
