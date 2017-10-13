@@ -1471,8 +1471,8 @@ int fileio(int op, char * filename, FILEFMT format,
   if (fio.op == FIO_READ) {
     /* 0xff fill unspecified memory */
     memset(mem->buf, 0xff, size);
+    memset(mem->tags, 0, size);
   }
-  memset(mem->tags, 0, size);
 
   using_stdio = 0;
 
