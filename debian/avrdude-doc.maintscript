@@ -1,0 +1,1 @@
+dir_to_symlink /usr/share/doc/avrdude-doc/avrdude-html ../avrdude/avrdude-html 6.2-1~
