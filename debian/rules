@@ -1,0 +1,16 @@
+#!/usr/bin/make -f
+
+ifeq ($(DEB_HOST_ARCH_OS),linux)
+	CONFFLAGS += --enable-linuxgpio
+endif
+%:
+	dh $@ --with autotools_dev --with autoreconf
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		--enable-versioned-doc=no \
+		--enable-doc \
+		$(CONFFLAGS)
+
+override_dh_install:
+	dh_install --list-missing
