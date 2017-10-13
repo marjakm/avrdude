@@ -1,3 +1,11 @@
+avrdude (6.3-4-mattis1) unstable; urgency=medium
+
+  * Base on upstream revision 1395
+  * Reset ftdi device on close
+  * Fix FT245R image verification
+
+ -- Mattis Marjak <mattis.marjak@defendec.com>  Fri, 13 Oct 2017 20:57:16 +0300
+
 avrdude (6.3-4) unstable; urgency=medium
 
   * Support ATtiny841 and ATtiny441
