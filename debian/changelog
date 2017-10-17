@@ -1,3 +1,9 @@
+avrdude (6.3-4-romi2) unstable; urgency=medium
+
+  * Fix ftdi reset for VM
+
+ -- Mattis Marjak <mattis.marjak@defendec.com>  Tue, 17 Oct 2017 17:42:19 +0300
+
 avrdude (6.3-4-mattis1) unstable; urgency=medium
 
   * Base on upstream revision 1395
