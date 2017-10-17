@@ -666,15 +666,15 @@ static void ft245r_close(PROGRAMMER * pgm) {
         e = ftdi_set_bitmode(handle, 0, BITMODE_RESET); // disable Synchronous BitBang
         avrdude_message(MSG_INFO, "BITMODE_RESET %d\n", e);
 
-        //e = ftdi_usb_reset(handle);
-        //avrdude_message(MSG_INFO, "ftdi_usb_reset %d\n", e);
+        e = ftdi_usb_reset(handle);
+        avrdude_message(MSG_INFO, "ftdi_usb_reset %d\n", e);
 
-        //ftdi_usb_close(handle);
         e = usb_claim_interface(handle->usb_dev, handle->interface);
         avrdude_message(MSG_INFO, "claim %d\n", e);
 
         e = usb_reset(handle->usb_dev);
 
+        ftdi_usb_close(handle);
         //e = usb_attach_kernel_driver(handle->usb_dev, handle->interface);
         avrdude_message(MSG_INFO, "usb_reset %d\n", e);
         handle->usb_dev = NULL;
