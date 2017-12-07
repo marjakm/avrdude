@@ -23,7 +23,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.60)
-AC_INIT(avrdude, 6.3-4-romi2, avrdude-dev@nongnu.org)
+AC_INIT(avrdude, 6.3-4-3mattis, avrdude-dev@nongnu.org)
 
 AC_CANONICAL_BUILD
 AC_CANONICAL_HOST
@@ -307,7 +307,7 @@ AC_ARG_ENABLE(
 		*)   AC_MSG_ERROR(bad value ${enableval} for enable-parport option) ;;
 		esac],
 	[enabled_parport=yes])
-	
+
 AC_ARG_ENABLE(
 	[linuxgpio],
 	AC_HELP_STRING(
@@ -318,7 +318,7 @@ AC_ARG_ENABLE(
 		no)  enabled_linuxgpio=no ;;
 		*)   AC_MSG_ERROR(bad value ${enableval} for enable-linuxgpio option) ;;
 		esac],
-	[enabled_linuxgpio=no])	
+	[enabled_linuxgpio=no])
 
 DIST_SUBDIRS_AC='doc windows'
 
@@ -409,10 +409,10 @@ if test "$GCC" = yes; then
 
 	AC_TRY_COMPILE(, [ int main () { return 0 ; } ], [
 		no_pointer_sign=yes
-		AC_MSG_RESULT([yes]) 
+		AC_MSG_RESULT([yes])
 		], [
 		no_pointer_sign=no
-		AC_MSG_RESULT([no]) 
+		AC_MSG_RESULT([no])
 		])
 	CFLAGS=$safe_CFLAGS
 

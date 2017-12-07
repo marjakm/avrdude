@@ -119,6 +119,8 @@ static int usbdev_open(char * port, union pinfo pinfo, union filedescriptor *fd)
 	  if (dev->descriptor.idVendor == pinfo.usbinfo.vid &&
 	      dev->descriptor.idProduct == pinfo.usbinfo.pid)
 	    {
+
+		avrdude_message(MSG_INFO, "Possible dev, try open \n");
 	      udev = usb_open(dev);
 	      if (udev)
 		{
@@ -534,7 +536,7 @@ static int usbdev_recv_frame(union filedescriptor *fd, unsigned char *buf, size_
 /*
  this ends when the buffer is completly filled (nbytes=0) or was too small (nbytes< 0)
  or a short packet is found.
- however we cannot say for nbytes=0 that there was really a packet completed, 
+ however we cannot say for nbytes=0 that there was really a packet completed,
  we had to check the last rv value than for a short packet,
  but what happens if the packet does not end with a short packet?
  and what if the buffer is filled without the packet was completed?
