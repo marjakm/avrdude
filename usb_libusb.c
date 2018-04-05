@@ -299,11 +299,13 @@ static int usbdev_open(char * port, union pinfo pinfo, union filedescriptor *fd)
 
 static void usbdev_close(union filedescriptor *fd)
 {
+  avrdude_message(MSG_INFO, "%s: usbdev_close() begin\n", progname);
   libusb_device_handle *udev = (libusb_device_handle *)fd->usb.handle;
 
   if (udev == NULL)
     return;
 
+  avrdude_message(MSG_INFO, "%s: usbdev_close() before libusb_release_interface\n", progname);
   (void)libusb_release_interface(udev, usb_interface);
 
 #if defined(__linux__)
@@ -312,10 +314,13 @@ static void usbdev_close(union filedescriptor *fd)
    * time we try to connect to it.  This is not necessary on
    * FreeBSD.
    */
-  libusb_reset_device(udev);
+  /* avrdude_message(MSG_INFO, "%s: usbdev_close() before libusb_reset_device\n", progname); */
+  /* libusb_reset_device(udev); */
 #endif
 
+  avrdude_message(MSG_INFO, "%s: usbdev_close() before libusb_close\n", progname);
   libusb_close(udev);
+  avrdude_message(MSG_INFO, "%s: usbdev_close() end\n", progname);
 }
 
 
